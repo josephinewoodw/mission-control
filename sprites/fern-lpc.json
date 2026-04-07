@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "bodyType": "female",
+  "selections": {
+    "head": { "itemId": "heads_human_female", "subId": null, "variant": "", "recolor": "brown", "name": "Human Female (brown)" },
+    "expression": { "itemId": "face_neutral", "subId": null, "variant": "", "recolor": "brown", "name": "Neutral (brown)" },
+    "body": { "itemId": "body", "subId": null, "variant": "", "recolor": "brown", "name": "Body Color (brown)" },
+    "eyebrows": { "itemId": "eyebrows_thin", "subId": null, "variant": "black", "recolor": "", "name": "Thin Eyebrows (black)" },
+    "nose": { "itemId": "head_nose_button", "subId": null, "variant": "", "recolor": "brown", "name": "Button nose (brown)" },
+    "hair": { "itemId": "hair_afro", "subId": null, "variant": "black", "recolor": "", "name": "Afro (black)" },
+    "clothes": { "itemId": "torso_clothes_longsleeve2_polo", "subId": null, "variant": "", "recolor": "sky", "name": "Longsleeve Polo (sky)" },
+    "legs": { "itemId": "legs_pantaloons", "subId": null, "variant": "", "recolor": "white", "name": "Pantaloons (white)" },
+    "shoes": { "itemId": "feet_shoes_basic", "subId": null, "variant": "brown", "recolor": "", "name": "Basic Shoes (brown)" },
+    "eyes": { "itemId": "heads_human_female", "subId": 1, "variant": "", "recolor": "brown", "name": "Eye Color (brown)" }
+  },
+  "selectedAnimation": "idle",
+  "url": "https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/#sex=female&head=Human_Female_brown&expression=Neutral_brown&body=Body_Color_brown&eyebrows=Thin_Eyebrows_black&nose=Button_nose_brown&hair=Afro_black&clothes=Longsleeve_Polo_sky&legs=Pantaloons_white&shoes=Basic_Shoes_brown&eyes=Eye_Color_brown"
+}

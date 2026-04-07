@@ -1,0 +1,11 @@
+{
+  "name": "mission-control",
+  "private": true,
+  "scripts": {
+    "dev": "bun run dev:frontend",
+    "dev:frontend": "cd frontend && bun run dev",
+    "dev:backend": "cd agents-observe/app/server && npm run dev",
+    "dev:all": "bun run dev:backend & bun run dev:frontend",
+    "seed": "bun run src/seed-db.ts"
+  }
+}

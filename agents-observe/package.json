@@ -1,0 +1,18 @@
+{
+  "name": "agents-observe",
+  "version": "0.7.4",
+  "description": "Real-time observability dashboard for Claude Code agents",
+  "license": "MIT",
+  "repository": "https://github.com/simple10/agents-observe",
+  "homepage": "https://github.com/simple10/agents-observe",
+  "private": true,
+  "scripts": {
+    "start": "node start.mjs",
+    "test": "vitest run && cd app/server && npm test && cd ../client && npm test",
+    "test:server:watch": "cd app/server && npm run test:watch",
+    "test:client:watch": "cd app/server && npm run test:watch"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,675 @@
+// app/server/src/storage/sqlite-adapter.ts
+
+import Database from 'better-sqlite3'
+import type { EventStore, InsertEventParams, EventFilters, StoredEvent } from './types'
+
+export class SqliteAdapter implements EventStore {
+  private db: Database.Database
+
+  constructor(dbPath: string) {
+    this.db = new Database(dbPath)
+
+    // PRAGMAs
+    this.db.pragma('journal_mode = WAL')
+    this.db.pragma('synchronous = NORMAL')
+    this.db.pragma('foreign_keys = ON')
+    this.db.pragma('cache_size = -64000') // 64MB cache (default 2MB)
+    this.db.pragma('temp_store = MEMORY')
+    this.db.pragma('mmap_size = 30000000') // 30MB memory-mapped I/O
+
+    // Create tables
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        transcript_path TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `)
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id),
+        slug TEXT,
+        status TEXT DEFAULT 'active',
+        started_at INTEGER NOT NULL,
+        stopped_at INTEGER,
+        metadata TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `)
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS agents (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        parent_agent_id TEXT,
+        name TEXT,
+        description TEXT,
+        agent_type TEXT,
+        agent_class TEXT DEFAULT 'claude-code',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (session_id) REFERENCES sessions(id),
+        FOREIGN KEY (parent_agent_id) REFERENCES agents(id)
+      )
+    `)
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        subtype TEXT,
+        tool_name TEXT,
+        summary TEXT,
+        timestamp INTEGER NOT NULL,
+        payload TEXT NOT NULL,
+        tool_use_id TEXT,
+        status TEXT DEFAULT 'pending',
+        FOREIGN KEY (agent_id) REFERENCES agents(id),
+        FOREIGN KEY (session_id) REFERENCES sessions(id)
+      )
+    `)
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS session_usage (
+        session_id TEXT PRIMARY KEY REFERENCES sessions(id),
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+        cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+        total_cost_usd REAL,
+        updated_at INTEGER NOT NULL
+      )
+    `)
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS agent_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_name TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT NOT NULL DEFAULT 'queued',
+        priority INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        started_at INTEGER,
+        completed_at INTEGER,
+        tool_use_id TEXT
+      )
+    `)
+
+    // Create indexes
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_projects_slug ON projects(slug)')
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_projects_transcript_path ON projects(transcript_path)')
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id, timestamp)')
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_events_agent ON events(agent_id, timestamp)')
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_events_type ON events(type, subtype)')
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_events_session_agent ON events(session_id, agent_id, timestamp)')
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_events_tool_use_id ON events(tool_use_id)')
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_agents_session ON agents(session_id)')
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_agents_parent ON agents(parent_agent_id)')
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id)')
+  }
+
+  async createProject(slug: string, name: string, transcriptPath: string | null): Promise<number> {
+    const now = Date.now()
+    const result = this.db
+      .prepare('INSERT INTO projects (slug, name, transcript_path, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+      .run(slug, name, transcriptPath, now, now)
+    return result.lastInsertRowid as number
+  }
+
+  async getProjectBySlug(slug: string): Promise<any | null> {
+    return this.db.prepare(`SELECT * FROM projects WHERE slug = ?`).get(slug) || null
+  }
+
+  async getProjectByTranscriptPath(transcriptPath: string): Promise<any | null> {
+    return (
+      this.db.prepare(`SELECT * FROM projects WHERE transcript_path = ?`).get(transcriptPath) ||
+      null
+    )
+  }
+
+  async updateProjectName(projectId: number, name: string): Promise<void> {
+    this.db.prepare('UPDATE projects SET name = ?, updated_at = ? WHERE id = ?').run(name, Date.now(), projectId)
+  }
+
+  async isSlugAvailable(slug: string): Promise<boolean> {
+    const row = this.db
+      .prepare(`SELECT id FROM projects WHERE slug = ?`)
+      .get(slug) as { id: number } | undefined
+    return row === undefined
+  }
+
+  async upsertSession(
+    id: string,
+    projectId: number,
+    slug: string | null,
+    metadata: Record<string, unknown> | null,
+    timestamp: number,
+  ): Promise<void> {
+    const now = Date.now()
+    this.db
+      .prepare(
+        `
+      INSERT INTO sessions (id, project_id, slug, status, started_at, metadata, created_at, updated_at)
+      VALUES (?, ?, ?, 'active', ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        slug = COALESCE(excluded.slug, sessions.slug),
+        metadata = COALESCE(excluded.metadata, sessions.metadata),
+        updated_at = ?
+    `,
+      )
+      .run(id, projectId, slug, timestamp, metadata ? JSON.stringify(metadata) : null, now, now, now)
+  }
+
+  async upsertAgent(
+    id: string,
+    sessionId: string,
+    parentAgentId: string | null,
+    name: string | null,
+    description: string | null,
+    agentType?: string | null,
+  ): Promise<void> {
+    const now = Date.now()
+    this.db
+      .prepare(
+        `
+      INSERT INTO agents (id, session_id, parent_agent_id, name, description, agent_type, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = COALESCE(excluded.name, agents.name),
+        description = COALESCE(excluded.description, agents.description),
+        agent_type = COALESCE(excluded.agent_type, agents.agent_type),
+        updated_at = ?
+    `,
+      )
+      .run(id, sessionId, parentAgentId, name, description, agentType ?? null, now, now, now)
+  }
+
+  async updateAgentType(id: string, agentType: string): Promise<void> {
+    this.db.prepare('UPDATE agents SET agent_type = ?, updated_at = ? WHERE id = ?').run(agentType, Date.now(), id)
+  }
+
+  async updateSessionStatus(id: string, status: string): Promise<void> {
+    this.db
+      .prepare(
+        `
+      UPDATE sessions SET status = ?, stopped_at = ? WHERE id = ?
+    `,
+      )
+      .run(status, status === 'stopped' ? Date.now() : null, id)
+  }
+
+  async updateSessionSlug(sessionId: string, slug: string): Promise<void> {
+    this.db
+      .prepare(
+        `
+      UPDATE sessions SET slug = ? WHERE id = ?
+    `,
+      )
+      .run(slug, sessionId)
+  }
+
+  async updateAgentName(agentId: string, name: string): Promise<void> {
+    this.db.prepare('UPDATE agents SET name = ?, updated_at = ? WHERE id = ?').run(name, Date.now(), agentId)
+  }
+
+  async insertEvent(params: InsertEventParams): Promise<number> {
+    const result = this.db
+      .prepare(
+        `
+      INSERT INTO events (agent_id, session_id, type, subtype, tool_name, summary, timestamp, payload, tool_use_id, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      )
+      .run(
+        params.agentId,
+        params.sessionId,
+        params.type,
+        params.subtype,
+        params.toolName,
+        params.summary,
+        params.timestamp,
+        JSON.stringify(params.payload),
+        params.toolUseId || null,
+        params.status || 'pending',
+      )
+
+    return Number(result.lastInsertRowid)
+  }
+
+  async getProjects(): Promise<any[]> {
+    return this.db
+      .prepare(
+        `
+      SELECT p.id, p.slug, p.name, p.transcript_path, p.created_at,
+        COUNT(DISTINCT s.id) as session_count
+      FROM projects p
+      LEFT JOIN sessions s ON s.project_id = p.id
+      GROUP BY p.id
+      ORDER BY p.created_at DESC
+    `,
+      )
+      .all()
+  }
+
+  async getSessionsForProject(projectId: number): Promise<any[]> {
+    return this.db
+      .prepare(
+        `
+      SELECT s.*,
+        COUNT(DISTINCT a.id) as agent_count,
+        COUNT(DISTINCT e.id) as event_count
+      FROM sessions s
+      LEFT JOIN agents a ON a.session_id = s.id
+      LEFT JOIN events e ON e.session_id = s.id
+      WHERE s.project_id = ?
+      GROUP BY s.id
+      ORDER BY s.started_at DESC
+    `,
+      )
+      .all(projectId)
+  }
+
+  async getSessionById(sessionId: string): Promise<any | null> {
+    return (
+      this.db
+        .prepare(
+          `
+      SELECT s.*,
+        COUNT(DISTINCT a.id) as agent_count,
+        COUNT(DISTINCT e.id) as event_count
+      FROM sessions s
+      LEFT JOIN agents a ON a.session_id = s.id
+      LEFT JOIN events e ON e.session_id = s.id
+      WHERE s.id = ?
+      GROUP BY s.id
+    `,
+        )
+        .get(sessionId) || null
+    )
+  }
+
+  async getAgentById(agentId: string): Promise<any | null> {
+    return this.db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) || null
+  }
+
+  async getAgentsForSession(sessionId: string): Promise<any[]> {
+    return this.db
+      .prepare('SELECT * FROM agents WHERE session_id = ? ORDER BY created_at ASC')
+      .all(sessionId)
+  }
+
+  async getEventsForSession(sessionId: string, filters?: EventFilters): Promise<StoredEvent[]> {
+    let sql = 'SELECT * FROM events WHERE session_id = ?'
+    const params: any[] = [sessionId]
+
+    if (filters?.agentIds && filters.agentIds.length > 0) {
+      const placeholders = filters.agentIds.map(() => '?').join(',')
+      sql += ` AND agent_id IN (${placeholders})`
+      params.push(...filters.agentIds)
+    }
+
+    if (filters?.type) {
+      sql += ' AND type = ?'
+      params.push(filters.type)
+    }
+
+    if (filters?.subtype) {
+      sql += ' AND subtype = ?'
+      params.push(filters.subtype)
+    }
+
+    if (filters?.search) {
+      sql += ' AND (summary LIKE ? OR payload LIKE ?)'
+      const term = `%${filters.search}%`
+      params.push(term, term)
+    }
+
+    // When limit is set without offset, sort DESC to get the most recent events,
+    // then reverse the results to maintain chronological order
+    const useDescForRecent = !!(filters?.limit && !filters?.offset)
+    sql += useDescForRecent ? ' ORDER BY timestamp DESC' : ' ORDER BY timestamp ASC'
+
+    if (filters?.limit) {
+      sql += ' LIMIT ?'
+      params.push(filters.limit)
+      if (filters?.offset) {
+        sql += ' OFFSET ?'
+        params.push(filters.offset)
+      }
+    }
+
+    const rows = this.db.prepare(sql).all(...params) as StoredEvent[]
+    return useDescForRecent ? rows.reverse() : rows
+  }
+
+  async getEventsForAgent(agentId: string): Promise<StoredEvent[]> {
+    return this.db
+      .prepare(
+        `
+      SELECT * FROM events WHERE agent_id = ? ORDER BY timestamp ASC
+    `,
+      )
+      .all(agentId) as StoredEvent[]
+  }
+
+  async getThreadForEvent(eventId: number): Promise<StoredEvent[]> {
+    const event = this.db.prepare('SELECT * FROM events WHERE id = ?').get(eventId) as
+      | StoredEvent
+      | undefined
+    if (!event) return []
+
+    const sessionId = event.session_id
+    const agentId = event.agent_id
+
+    // For SubagentStop or events from a non-root agent:
+    // return all events belonging to that specific agent
+    const isSubagent = agentId !== sessionId
+    if (event.subtype === 'SubagentStop' || isSubagent) {
+      return this.db
+        .prepare('SELECT * FROM events WHERE agent_id = ? ORDER BY timestamp ASC')
+        .all(agentId) as StoredEvent[]
+    }
+
+    // For root agent events: find the turn boundary (Prompt -> Stop)
+    const prevPrompt = this.db
+      .prepare(
+        `SELECT timestamp FROM events
+         WHERE session_id = ? AND subtype = 'UserPromptSubmit' AND timestamp <= ?
+         ORDER BY timestamp DESC LIMIT 1`,
+      )
+      .get(sessionId, event.timestamp) as { timestamp: number } | undefined
+
+    const startTs = prevPrompt ? prevPrompt.timestamp : 0
+
+    // End at the first Stop or next UserPromptSubmit
+    const nextBoundary = this.db
+      .prepare(
+        `SELECT timestamp FROM events
+         WHERE session_id = ? AND timestamp > ?
+           AND (subtype = 'UserPromptSubmit' OR subtype = 'Stop' OR subtype = 'SubagentStop')
+         ORDER BY timestamp ASC LIMIT 1`,
+      )
+      .get(sessionId, startTs) as { timestamp: number } | undefined
+
+    const endTs = nextBoundary ? nextBoundary.timestamp : Infinity
+
+    if (endTs === Infinity) {
+      return this.db
+        .prepare(
+          'SELECT * FROM events WHERE session_id = ? AND timestamp >= ? ORDER BY timestamp ASC',
+        )
+        .all(sessionId, startTs) as StoredEvent[]
+    }
+
+    return this.db
+      .prepare(
+        'SELECT * FROM events WHERE session_id = ? AND timestamp >= ? AND timestamp <= ? ORDER BY timestamp ASC',
+      )
+      .all(sessionId, startTs, endTs) as StoredEvent[]
+  }
+
+  async getEventsSince(sessionId: string, sinceTimestamp: number): Promise<StoredEvent[]> {
+    return this.db
+      .prepare(
+        `
+      SELECT * FROM events WHERE session_id = ? AND timestamp > ? ORDER BY timestamp ASC
+    `,
+      )
+      .all(sessionId, sinceTimestamp) as StoredEvent[]
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    this.db.prepare('DELETE FROM events WHERE session_id = ?').run(sessionId)
+    this.db.prepare('DELETE FROM agents WHERE session_id = ?').run(sessionId)
+    this.db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId)
+  }
+
+  async deleteProject(projectId: number): Promise<void> {
+    // Get all session IDs for this project
+    const sessions = this.db
+      .prepare('SELECT id FROM sessions WHERE project_id = ?')
+      .all(projectId) as { id: string }[]
+    for (const session of sessions) {
+      this.db.prepare('DELETE FROM events WHERE session_id = ?').run(session.id)
+      this.db.prepare('DELETE FROM agents WHERE session_id = ?').run(session.id)
+    }
+    this.db.prepare('DELETE FROM sessions WHERE project_id = ?').run(projectId)
+    this.db.prepare('DELETE FROM projects WHERE id = ?').run(projectId)
+  }
+
+  async clearAllData(): Promise<void> {
+    this.db.prepare('DELETE FROM events WHERE 1=1').run()
+    this.db.prepare('DELETE FROM agents WHERE 1=1').run()
+    this.db.prepare('DELETE FROM sessions WHERE 1=1').run()
+    this.db.prepare('DELETE FROM projects WHERE 1=1').run()
+  }
+
+  async clearSessionEvents(sessionId: string): Promise<void> {
+    this.db.prepare('DELETE FROM events WHERE session_id = ?').run(sessionId)
+    this.db.prepare('DELETE FROM agents WHERE session_id = ?').run(sessionId)
+  }
+
+  async getRecentSessions(limit: number = 20): Promise<any[]> {
+    return this.db
+      .prepare(
+        `
+      SELECT s.*,
+        p.slug as project_slug,
+        p.name as project_name,
+        COUNT(DISTINCT a.id) as agent_count,
+        COUNT(DISTINCT e.id) as event_count,
+        MAX(e.timestamp) as last_activity
+      FROM sessions s
+      JOIN projects p ON p.id = s.project_id
+      LEFT JOIN agents a ON a.session_id = s.id
+      LEFT JOIN events e ON e.session_id = s.id
+      GROUP BY s.id
+      ORDER BY COALESCE(MAX(e.timestamp), s.started_at) DESC
+      LIMIT ?
+    `,
+      )
+      .all(limit)
+  }
+
+  async upsertSessionUsage(
+    sessionId: string,
+    usage: {
+      inputTokens: number
+      outputTokens: number
+      cacheReadTokens: number
+      cacheCreationTokens: number
+      totalCostUsd?: number | null
+    },
+  ): Promise<void> {
+    const now = Date.now()
+    this.db
+      .prepare(
+        `
+      INSERT INTO session_usage (session_id, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, total_cost_usd, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(session_id) DO UPDATE SET
+        input_tokens = excluded.input_tokens,
+        output_tokens = excluded.output_tokens,
+        cache_read_tokens = excluded.cache_read_tokens,
+        cache_creation_tokens = excluded.cache_creation_tokens,
+        total_cost_usd = COALESCE(excluded.total_cost_usd, session_usage.total_cost_usd),
+        updated_at = ?
+    `,
+      )
+      .run(
+        sessionId,
+        usage.inputTokens,
+        usage.outputTokens,
+        usage.cacheReadTokens,
+        usage.cacheCreationTokens,
+        usage.totalCostUsd ?? null,
+        now,
+        now,
+      )
+  }
+
+  async getSessionUsage(sessionId: string): Promise<any | null> {
+    return (
+      this.db
+        .prepare('SELECT * FROM session_usage WHERE session_id = ?')
+        .get(sessionId) || null
+    )
+  }
+
+  async getUsageForSessions(sessionIds: string[]): Promise<any[]> {
+    if (sessionIds.length === 0) return []
+    const placeholders = sessionIds.map(() => '?').join(',')
+    return this.db
+      .prepare(`SELECT * FROM session_usage WHERE session_id IN (${placeholders})`)
+      .all(...sessionIds)
+  }
+
+  async createTask(params: {
+    agentName: string
+    title: string
+    description?: string | null
+    priority?: number
+    toolUseId?: string | null
+  }): Promise<number> {
+    const now = Date.now()
+    const result = this.db
+      .prepare(
+        `INSERT INTO agent_tasks (agent_name, title, description, status, priority, created_at, tool_use_id)
+         VALUES (?, ?, ?, 'queued', ?, ?, ?)`,
+      )
+      .run(params.agentName, params.title, params.description ?? null, params.priority ?? 0, now, params.toolUseId ?? null)
+    return result.lastInsertRowid as number
+  }
+
+  async getTasksForAgent(agentName: string, limit: number = 20): Promise<any[]> {
+    return this.db
+      .prepare(
+        `SELECT * FROM agent_tasks
+         WHERE agent_name = ?
+         ORDER BY
+           CASE status
+             WHEN 'active' THEN 0
+             WHEN 'queued' THEN 1
+             WHEN 'completed' THEN 2
+             WHEN 'failed' THEN 3
+             WHEN 'stale' THEN 4
+             ELSE 5
+           END,
+           priority DESC,
+           created_at DESC
+         LIMIT ?`,
+      )
+      .all(agentName, limit)
+  }
+
+  async getAllTasks(limit: number = 50): Promise<any[]> {
+    return this.db
+      .prepare(
+        `SELECT * FROM agent_tasks
+         ORDER BY
+           CASE status
+             WHEN 'active' THEN 0
+             WHEN 'queued' THEN 1
+             WHEN 'completed' THEN 2
+             WHEN 'failed' THEN 3
+             WHEN 'stale' THEN 4
+             ELSE 5
+           END,
+           priority DESC,
+           created_at DESC
+         LIMIT ?`,
+      )
+      .all(limit)
+  }
+
+  async updateTaskStatus(
+    id: number,
+    status: 'queued' | 'active' | 'completed' | 'failed' | 'stale',
+  ): Promise<void> {
+    const now = Date.now()
+    const startedAt = status === 'active' ? now : null
+    const completedAt = status === 'completed' || status === 'failed' ? now : null
+
+    if (status === 'active') {
+      this.db
+        .prepare(`UPDATE agent_tasks SET status = ?, started_at = ? WHERE id = ?`)
+        .run(status, startedAt, id)
+    } else if (status === 'completed' || status === 'failed') {
+      this.db
+        .prepare(`UPDATE agent_tasks SET status = ?, completed_at = ? WHERE id = ?`)
+        .run(status, completedAt, id)
+    } else {
+      this.db.prepare(`UPDATE agent_tasks SET status = ? WHERE id = ?`).run(status, id)
+    }
+  }
+
+  async updateTaskByToolUseId(
+    toolUseId: string,
+    status: 'active' | 'completed' | 'failed',
+  ): Promise<void> {
+    const now = Date.now()
+    if (status === 'active') {
+      this.db
+        .prepare(`UPDATE agent_tasks SET status = ?, started_at = ? WHERE tool_use_id = ? AND status = 'queued'`)
+        .run(status, now, toolUseId)
+    } else {
+      this.db
+        .prepare(`UPDATE agent_tasks SET status = ?, completed_at = ? WHERE tool_use_id = ?`)
+        .run(status, now, toolUseId)
+    }
+  }
+
+  async getTaskById(id: number): Promise<any | null> {
+    return this.db.prepare(`SELECT * FROM agent_tasks WHERE id = ?`).get(id) || null
+  }
+
+  /**
+   * Mark all active/queued tasks as stale. Called on server startup to clean up
+   * tasks that were left open when the previous session crashed or was killed.
+   * Returns the number of tasks marked stale.
+   */
+  async markStaleTasksOnStartup(): Promise<number> {
+    const result = this.db
+      .prepare(
+        `UPDATE agent_tasks SET status = 'stale', completed_at = ?
+         WHERE status IN ('active', 'queued')`,
+      )
+      .run(Date.now())
+    const count = result.changes
+    if (count > 0) {
+      console.log(`[startup] Marked ${count} stale task(s) from previous sessions`)
+    }
+    return count
+  }
+
+  async healthCheck(): Promise<{ ok: boolean; error?: string }> {
+    try {
+      const row = this.db.prepare('SELECT 1 AS ok').get() as { ok: number } | undefined
+      if (row?.ok !== 1) return { ok: false, error: 'SQLite query returned unexpected result' }
+
+      // Verify tables exist
+      const tables = this.db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('projects','sessions','events','agents')")
+        .all() as { name: string }[]
+      if (tables.length < 4) {
+        const missing = ['projects', 'sessions', 'events', 'agents'].filter(
+          (t) => !tables.some((r) => r.name === t),
+        )
+        return { ok: false, error: `Missing tables: ${missing.join(', ')}` }
+      }
+
+      return { ok: true }
+    } catch (err: any) {
+      return { ok: false, error: err.message || 'Unknown database error' }
+    }
+  }
+}

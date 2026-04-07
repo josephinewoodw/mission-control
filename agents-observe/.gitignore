@@ -1,0 +1,41 @@
+.DS_Store
+
+# TypeScript / JavaScript / Node
+node_modules/
+/package-lock.json
+app/**/dist/
+*.tsbuildinfo
+
+# Bun
+bun.lockb
+.bun/
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+.coverage
+htmlcov/
+
+# Docker data directory
+/data/
+/logs/
+
+# Security
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Misc
+.superpowers/
+
+# Backup & temp
+bak/
+
+.justfile.swp

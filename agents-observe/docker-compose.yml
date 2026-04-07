@@ -1,0 +1,16 @@
+services:
+  agents-observe:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agents-observe
+    environment:
+      AGENTS_OBSERVE_SERVER_PORT: "${AGENTS_OBSERVE_SERVER_PORT:-4981}"
+      AGENTS_OBSERVE_DB_PATH: /data/observe.db
+      AGENTS_OBSERVE_CLIENT_DIST_PATH: /app/client/dist
+      AGENTS_OBSERVE_LOG_LEVEL: "${AGENTS_OBSERVE_LOG_LEVEL:-debug}"
+      AGENTS_OBSERVE_RUNTIME: docker
+    ports:
+      - "${AGENTS_OBSERVE_SERVER_PORT:-4981}:${AGENTS_OBSERVE_SERVER_PORT:-4981}"
+    volumes:
+      - ${AGENTS_OBSERVE_DATA_DIR:-./data}:/data

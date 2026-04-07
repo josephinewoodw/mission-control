@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "bodyType": "male",
+  "selections": {
+    "head": { "itemId": "heads_human_male", "subId": null, "variant": "", "recolor": "light", "name": "Human Male (light)" },
+    "expression": { "itemId": "face_neutral", "subId": null, "variant": "", "recolor": "light", "name": "Neutral (light)" },
+    "body": { "itemId": "body", "subId": null, "variant": "", "recolor": "light", "name": "Body Color (light)" },
+    "nose": { "itemId": "head_nose_button", "subId": null, "variant": "", "recolor": "light", "name": "Button nose (light)" },
+    "clothes": { "itemId": "torso_clothes_longsleeve", "subId": null, "variant": "", "recolor": "gray", "name": "Longsleeve (gray)" },
+    "legs": { "itemId": "legs_pantaloons", "subId": null, "variant": "", "recolor": "navy", "name": "Pantaloons (navy)" },
+    "shoes": { "itemId": "feet_shoes_basic", "subId": null, "variant": "black", "recolor": "", "name": "Basic Shoes (black)" },
+    "hair": { "itemId": "hair_messy2", "subId": null, "variant": "redhead", "recolor": "", "name": "Messy2 (redhead)" },
+    "eyes": { "itemId": "heads_human_male", "subId": 1, "variant": "", "recolor": "green", "name": "Eye Color (green)" }
+  },
+  "selectedAnimation": "idle",
+  "url": "https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/#sex=male&head=Human_Male_light&expression=Neutral_light&body=Body_Color_light&nose=Button_nose_light&clothes=Longsleeve_gray&legs=Pantaloons_navy&shoes=Basic_Shoes_black&hair=Messy2_redhead&eyes=Eye_Color_green"
+}

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mission Control 🌿</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #16213e, #1a1a2e);
+            border-bottom: 1px solid #2a2a4a;
+        }
+
+        .header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #a8d8a8;
+            letter-spacing: 0.5px;
+        }
+
+        .header .subtitle {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .office {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 500px) {
+            .office {
+                grid-template-columns: 1fr;
+                padding: 12px;
+                gap: 12px;
+            }
+        }
+
+        .desk {
+            background: #16213e;
+            border-radius: 16px;
+            padding: 20px;
+            position: relative;
+            border: 1px solid #2a2a4a;
+            transition: all 0.3s ease;
+        }
+
+        .desk.working {
+            border-color: #4a9e4a;
+            box-shadow: 0 0 20px rgba(74, 158, 74, 0.1);
+        }
+
+        .desk.blocked {
+            border-color: #e74c3c;
+            box-shadow: 0 0 20px rgba(231, 76, 60, 0.1);
+            animation: pulse-blocked 2s ease-in-out infinite;
+        }
+
+        .desk.offline {
+            opacity: 0.5;
+        }
+
+        @keyframes pulse-blocked {
+            0%, 100% { box-shadow: 0 0 20px rgba(231, 76, 60, 0.1); }
+            50% { box-shadow: 0 0 30px rgba(231, 76, 60, 0.3); }
+        }
+
+        .agent-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #2a2a4a;
+            border: 2px solid #3a3a5a;
+            transition: border-color 0.3s;
+        }
+
+        .desk.working .avatar {
+            border-color: #4a9e4a;
+        }
+
+        .desk.blocked .avatar {
+            border-color: #e74c3c;
+        }
+
+        .agent-info {
+            flex: 1;
+        }
+
+        .agent-name {
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .agent-role {
+            font-size: 0.7rem;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.idle { background: #666; }
+        .status-dot.working { background: #4a9e4a; animation: pulse-dot 1.5s ease-in-out infinite; }
+        .status-dot.blocked { background: #e74c3c; animation: pulse-dot 1s ease-in-out infinite; }
+        .status-dot.offline { background: #333; }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .current-task {
+            font-size: 0.8rem;
+            color: #aaa;
+            padding: 8px 10px;
+            background: #0f0f23;
+            border-radius: 8px;
+            min-height: 36px;
+            display: flex;
+            align-items: center;
+        }
+
+        .current-task.empty {
+            color: #555;
+            font-style: italic;
+        }
+
+        .last-activity {
+            font-size: 0.65rem;
+            color: #555;
+            margin-top: 8px;
+            text-align: right;
+        }
+
+        /* Activity Feed */
+        .feed {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 20px 20px;
+        }
+
+        .feed h2 {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .feed-list {
+            list-style: none;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .feed-item {
+            font-size: 0.75rem;
+            color: #777;
+            padding: 4px 0;
+            border-bottom: 1px solid #1a1a2e;
+            display: flex;
+            gap: 8px;
+        }
+
+        .feed-item .time {
+            color: #444;
+            font-family: monospace;
+            white-space: nowrap;
+        }
+
+        .feed-item .agent-tag {
+            font-weight: 600;
+            min-width: 60px;
+        }
+
+        .feed-item .agent-tag.fern { color: #a8d8a8; }
+        .feed-item .agent-tag.scout { color: #a8c8d8; }
+        .feed-item .agent-tag.reed { color: #d8c8a8; }
+        .feed-item .agent-tag.sentinel { color: #c8a8d8; }
+
+        /* Connection status */
+        .connection {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            font-size: 0.65rem;
+            padding: 4px 8px;
+            border-radius: 12px;
+            background: #16213e;
+            border: 1px solid #2a2a4a;
+        }
+
+        .connection.connected { color: #4a9e4a; }
+        .connection.disconnected { color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌿 Mission Control</h1>
+        <div class="subtitle" id="clock"></div>
+    </div>
+
+    <div class="office" id="office">
+        <!-- Agent desks populated by JS -->
+    </div>
+
+    <div class="feed">
+        <h2>Activity Feed</h2>
+        <ul class="feed-list" id="feed"></ul>
+    </div>
+
+    <div class="connection disconnected" id="connection">disconnected</div>
+
+    <script>
+        const AGENTS = {
+            fern: { emoji: '🌿', role: 'Coordinator', color: '#a8d8a8' },
+            scout: { emoji: '🔍', role: 'Research', color: '#a8c8d8' },
+            reed: { emoji: '🎨', role: 'Content', color: '#d8c8a8' },
+            sentinel: { emoji: '🛡️', role: 'Operations', color: '#c8a8d8' },
+        }
+
+        // State
+        let agentStatuses = {}
+        let ws = null
+
+        // Render agent desks
+        function renderOffice() {
+            const office = document.getElementById('office')
+            office.innerHTML = Object.entries(AGENTS).map(([name, info]) => {
+                const status = agentStatuses[name] || { status: 'offline', current_task: '', last_activity: '' }
+                const taskText = status.current_task || ''
+                const lastActivity = status.last_activity ? timeAgo(status.last_activity) : ''
+
+                return `
+                    <div class="desk ${status.status}" id="desk-${name}">
+                        <div class="agent-header">
+                            <img class="avatar" src="/assets/${name}-avatar.png"
+                                 onerror="this.style.display='none'"
+                                 alt="${name}">
+                            <div class="agent-info">
+                                <div class="agent-name">
+                                    <span class="status-dot ${status.status}"></span>
+                                    ${info.emoji} ${name.charAt(0).toUpperCase() + name.slice(1)}
+                                </div>
+                                <div class="agent-role">${info.role} · ${status.status}</div>
+                            </div>
+                        </div>
+                        <div class="current-task ${taskText ? '' : 'empty'}">
+                            ${taskText || 'No active task'}
+                        </div>
+                        ${lastActivity ? `<div class="last-activity">Last active: ${lastActivity}</div>` : ''}
+                    </div>
+                `
+            }).join('')
+        }
+
+        // Render activity feed
+        function renderFeed(events) {
+            const feed = document.getElementById('feed')
+            if (!events || events.length === 0) return
+
+            const items = events.slice(0, 30).map(e => {
+                const time = new Date(e.timestamp).toLocaleTimeString('en-US', {
+                    hour: '2-digit', minute: '2-digit', hour12: false
+                })
+                return `
+                    <li class="feed-item">
+                        <span class="time">${time}</span>
+                        <span class="agent-tag ${e.agent}">${e.agent}</span>
+                        <span>${e.event_type}${e.tool_name ? ': ' + e.tool_name : ''}</span>
+                    </li>
+                `
+            }).join('')
+
+            feed.innerHTML = items
+        }
+
+        // Time ago helper
+        function timeAgo(timestamp) {
+            const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000)
+            if (seconds < 60) return 'just now'
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+            return `${Math.floor(seconds / 86400)}d ago`
+        }
+
+        // Update clock
+        function updateClock() {
+            const now = new Date()
+            document.getElementById('clock').textContent = now.toLocaleString('en-US', {
+                weekday: 'short', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: true
+            })
+        }
+        setInterval(updateClock, 1000)
+        updateClock()
+
+        // WebSocket connection
+        function connect() {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+            ws = new WebSocket(`${protocol}//${location.host}/ws`)
+
+            ws.onopen = () => {
+                document.getElementById('connection').className = 'connection connected'
+                document.getElementById('connection').textContent = 'connected'
+            }
+
+            ws.onclose = () => {
+                document.getElementById('connection').className = 'connection disconnected'
+                document.getElementById('connection').textContent = 'disconnected'
+                // Reconnect after 3 seconds
+                setTimeout(connect, 3000)
+            }
+
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data)
+
+                if (data.statuses) {
+                    agentStatuses = {}
+                    data.statuses.forEach(s => { agentStatuses[s.agent] = s })
+                    renderOffice()
+                }
+
+                if (data.events) {
+                    renderFeed(data.events)
+                }
+            }
+        }
+
+        // Initial render and connect
+        renderOffice()
+        connect()
+
+        // Also fetch initial state via REST as backup
+        fetch('/api/status')
+            .then(r => r.json())
+            .then(data => {
+                data.agents.forEach(s => { agentStatuses[s.agent] = s })
+                renderOffice()
+            })
+            .catch(() => {})
+
+        fetch('/api/events')
+            .then(r => r.json())
+            .then(data => renderFeed(data.events))
+            .catch(() => {})
+    </script>
+</body>
+</html>

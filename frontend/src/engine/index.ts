@@ -1,0 +1,8 @@
+export { createGameLoop } from './gameLoop'
+export type { GameLoop } from './gameLoop'
+export { Character } from './character'
+export { preloadSprites, spritesReady, preloadTileAssets, tileAssetsReady } from './spriteCache'
+export { CANVAS_W, CANVAS_H } from './constants'
+export { loadLayout } from './tileMap'
+export { clearFurnitureCache } from './furniture'
+export type { AgentData, CharacterState } from './types'

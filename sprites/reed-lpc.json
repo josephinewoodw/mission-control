@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "bodyType": "male",
+  "selections": {
+    "head": { "itemId": "heads_human_male", "subId": null, "variant": "", "recolor": "taupe", "name": "Human Male (taupe)" },
+    "expression": { "itemId": "face_neutral", "subId": null, "variant": "", "recolor": "taupe", "name": "Neutral (taupe)" },
+    "body": { "itemId": "body", "subId": null, "variant": "", "recolor": "taupe", "name": "Body Color (taupe)" },
+    "eyebrows": { "itemId": "eyebrows_thin", "subId": null, "variant": "black", "recolor": "", "name": "Thin Eyebrows (black)" },
+    "nose": { "itemId": "head_nose_button", "subId": null, "variant": "", "recolor": "taupe", "name": "Button nose (taupe)" },
+    "hair": { "itemId": "hair_page", "subId": null, "variant": "dark brown", "recolor": "", "name": "Page (dark brown)" },
+    "clothes": { "itemId": "torso_clothes_longsleeve2_buttoned", "subId": null, "variant": "", "recolor": "forest", "name": "Longsleeve 2 Buttoned (forest)" },
+    "legs": { "itemId": "legs_pantaloons", "subId": null, "variant": "", "recolor": "navy", "name": "Pantaloons (navy)" },
+    "shoes": { "itemId": "feet_shoes_basic", "subId": null, "variant": "brown", "recolor": "", "name": "Basic Shoes (brown)" },
+    "beard": { "itemId": "beards_trimmed", "subId": null, "variant": "dark brown", "recolor": "", "name": "Trimmed Beard (dark brown)" },
+    "eyes": { "itemId": "heads_human_male", "subId": 1, "variant": "", "recolor": "brown", "name": "Eye Color (brown)" }
+  },
+  "selectedAnimation": "idle",
+  "url": "https://liberatedpixelcup.github.io/Universal-LPC-Spritesheet-Character-Generator/#sex=male&head=Human_Male_taupe&expression=Neutral_taupe&body=Body_Color_taupe&eyebrows=Thin_Eyebrows_black&nose=Button_nose_taupe&hair=Page_dark%20brown&clothes=Longsleeve_2_Buttoned_forest&legs=Pantaloons_navy&shoes=Basic_Shoes_brown&beard=Trimmed_Beard_dark%20brown&eyes=Eye_Color_brown"
+}
