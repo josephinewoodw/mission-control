@@ -1,7 +1,7 @@
 // app/server/src/storage/sqlite-adapter.ts
 
 import Database from 'better-sqlite3'
-import type { EventStore, InsertEventParams, EventFilters, StoredEvent } from './types'
+import type { EventStore, InsertEventParams, EventFilters, StoredEvent, KanbanTask, KanbanStatus, KanbanPriority } from './types'
 
 export class SqliteAdapter implements EventStore {
   private db: Database.Database
@@ -111,6 +111,22 @@ export class SqliteAdapter implements EventStore {
     } catch {
       // Column already exists — ignore
     }
+
+    // Kanban tasks — persistent strategic backlog, separate from live agent_tasks
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS kanban_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        agent_name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'backlog',
+        priority TEXT NOT NULL DEFAULT 'medium',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        activated_at INTEGER,
+        completed_at INTEGER
+      )
+    `)
 
     // Create indexes
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_projects_slug ON projects(slug)')
@@ -701,5 +717,129 @@ export class SqliteAdapter implements EventStore {
     } catch (err: any) {
       return { ok: false, error: err.message || 'Unknown database error' }
     }
+  }
+
+  // =========================================================
+  // Kanban tasks — persistent strategic backlog
+  // =========================================================
+
+  async createKanbanTask(params: {
+    title: string
+    description?: string | null
+    agentName: string
+    status?: KanbanStatus
+    priority?: KanbanPriority
+  }): Promise<number> {
+    const now = Date.now()
+    const result = this.db
+      .prepare(
+        `INSERT INTO kanban_tasks (title, description, agent_name, status, priority, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        params.title,
+        params.description ?? null,
+        params.agentName,
+        params.status ?? 'backlog',
+        params.priority ?? 'medium',
+        now,
+        now,
+      )
+    return result.lastInsertRowid as number
+  }
+
+  async getKanbanTasks(): Promise<KanbanTask[]> {
+    return this.db
+      .prepare(
+        `SELECT * FROM kanban_tasks
+         ORDER BY
+           CASE status
+             WHEN 'active' THEN 0
+             WHEN 'in_progress' THEN 1
+             WHEN 'backlog' THEN 2
+             WHEN 'done' THEN 3
+             ELSE 4
+           END,
+           CASE priority
+             WHEN 'high' THEN 0
+             WHEN 'medium' THEN 1
+             WHEN 'low' THEN 2
+             ELSE 3
+           END,
+           created_at DESC`,
+      )
+      .all() as KanbanTask[]
+  }
+
+  async getKanbanTaskById(id: number): Promise<KanbanTask | null> {
+    return (this.db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(id) as KanbanTask) || null
+  }
+
+  async updateKanbanTask(
+    id: number,
+    updates: Partial<{
+      title: string
+      description: string | null
+      agentName: string
+      status: KanbanStatus
+      priority: KanbanPriority
+    }>,
+  ): Promise<void> {
+    const now = Date.now()
+    const fields: string[] = ['updated_at = ?']
+    const values: any[] = [now]
+
+    if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title) }
+    if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description) }
+    if (updates.agentName !== undefined) { fields.push('agent_name = ?'); values.push(updates.agentName) }
+    if (updates.priority !== undefined) { fields.push('priority = ?'); values.push(updates.priority) }
+    if (updates.status !== undefined) {
+      fields.push('status = ?')
+      values.push(updates.status)
+      // Set activated_at when moved to active
+      if (updates.status === 'active') {
+        fields.push('activated_at = ?')
+        values.push(now)
+      }
+      // Set completed_at when moved to done
+      if (updates.status === 'done') {
+        fields.push('completed_at = ?')
+        values.push(now)
+      }
+    }
+
+    values.push(id)
+    this.db.prepare(`UPDATE kanban_tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+  }
+
+  async deleteKanbanTask(id: number): Promise<void> {
+    this.db.prepare('DELETE FROM kanban_tasks WHERE id = ?').run(id)
+  }
+
+  async getPendingKanbanTasks(): Promise<KanbanTask[]> {
+    // Returns tasks with status 'active' that haven't been claimed (not in_progress or done)
+    return this.db
+      .prepare(
+        `SELECT * FROM kanban_tasks
+         WHERE status = 'active'
+         ORDER BY
+           CASE priority
+             WHEN 'high' THEN 0
+             WHEN 'medium' THEN 1
+             WHEN 'low' THEN 2
+             ELSE 3
+           END,
+           activated_at ASC`,
+      )
+      .all() as KanbanTask[]
+  }
+
+  async claimKanbanTask(id: number): Promise<void> {
+    const now = Date.now()
+    this.db
+      .prepare(
+        `UPDATE kanban_tasks SET status = 'in_progress', updated_at = ? WHERE id = ? AND status = 'active'`,
+      )
+      .run(now, id)
   }
 }

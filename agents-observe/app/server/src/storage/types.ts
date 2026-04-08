@@ -108,4 +108,41 @@ export interface EventStore {
   markStaleTasksOnStartup(): Promise<number>
   /** Mark active/queued tasks from previous sessions as stale — called on SessionStart with the new session ID */
   markStaleTasksForNewSession(currentSessionId: string): Promise<number>
+
+  // Kanban tasks (persistent strategic backlog — separate from live agent_tasks)
+  createKanbanTask(params: {
+    title: string
+    description?: string | null
+    agentName: string
+    status?: KanbanStatus
+    priority?: KanbanPriority
+  }): Promise<number>
+  getKanbanTasks(): Promise<KanbanTask[]>
+  getKanbanTaskById(id: number): Promise<KanbanTask | null>
+  updateKanbanTask(id: number, updates: Partial<{
+    title: string
+    description: string | null
+    agentName: string
+    status: KanbanStatus
+    priority: KanbanPriority
+  }>): Promise<void>
+  deleteKanbanTask(id: number): Promise<void>
+  getPendingKanbanTasks(): Promise<KanbanTask[]>
+  claimKanbanTask(id: number): Promise<void>
+}
+
+export type KanbanStatus = 'backlog' | 'active' | 'in_progress' | 'done'
+export type KanbanPriority = 'low' | 'medium' | 'high'
+
+export interface KanbanTask {
+  id: number
+  title: string
+  description: string | null
+  agent_name: string
+  status: KanbanStatus
+  priority: KanbanPriority
+  created_at: number
+  updated_at: number
+  activated_at: number | null
+  completed_at: number | null
 }
