@@ -152,6 +152,7 @@ router.post('/events', async (c) => {
           description: taskDescription,
           priority: 0,
           toolUseId: parsed.toolUseId || null,
+          sessionId: parsed.sessionId,
         })
         if (broadcastToAll) {
           broadcastToAll({ type: 'task_created', data: { agentName: resolvedAgent, title: taskTitle } })
@@ -270,10 +271,10 @@ router.post('/events', async (c) => {
         data: { id: parsed.sessionId, status: 'stopped' },
       })
     } else if (parsed.subtype === 'SessionStart') {
-      // A new session is starting. Mark any active/queued tasks as stale so they
-      // don't persist into the new session's display.
+      // A new session is starting. Mark active/queued tasks from PREVIOUS sessions
+      // as stale — but preserve tasks created in THIS session (same session_id).
       try {
-        const staleCount = await store.markStaleTasksOnStartup()
+        const staleCount = await store.markStaleTasksForNewSession(parsed.sessionId)
         if (staleCount > 0) {
           broadcastToAll({ type: 'tasks_staled', data: { count: staleCount } })
         }

@@ -100,9 +100,17 @@ export class SqliteAdapter implements EventStore {
         created_at INTEGER NOT NULL,
         started_at INTEGER,
         completed_at INTEGER,
-        tool_use_id TEXT
+        tool_use_id TEXT,
+        session_id TEXT
       )
     `)
+
+    // Migration: add session_id column if it doesn't exist (for existing databases)
+    try {
+      this.db.exec(`ALTER TABLE agent_tasks ADD COLUMN session_id TEXT`)
+    } catch {
+      // Column already exists — ignore
+    }
 
     // Create indexes
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_projects_slug ON projects(slug)')
@@ -539,14 +547,15 @@ export class SqliteAdapter implements EventStore {
     description?: string | null
     priority?: number
     toolUseId?: string | null
+    sessionId?: string | null
   }): Promise<number> {
     const now = Date.now()
     const result = this.db
       .prepare(
-        `INSERT INTO agent_tasks (agent_name, title, description, status, priority, created_at, tool_use_id)
-         VALUES (?, ?, ?, 'queued', ?, ?, ?)`,
+        `INSERT INTO agent_tasks (agent_name, title, description, status, priority, created_at, tool_use_id, session_id)
+         VALUES (?, ?, ?, 'queued', ?, ?, ?, ?)`,
       )
-      .run(params.agentName, params.title, params.description ?? null, params.priority ?? 0, now, params.toolUseId ?? null)
+      .run(params.agentName, params.title, params.description ?? null, params.priority ?? 0, now, params.toolUseId ?? null, params.sessionId ?? null)
     return result.lastInsertRowid as number
   }
 
@@ -633,8 +642,8 @@ export class SqliteAdapter implements EventStore {
   }
 
   /**
-   * Mark all active/queued tasks as stale. Called on server startup to clean up
-   * tasks that were left open when the previous session crashed or was killed.
+   * Mark ALL active/queued tasks as stale. Called on server cold startup (no session yet)
+   * to clean up tasks left open when the previous session crashed or was killed.
    * Returns the number of tasks marked stale.
    */
   async markStaleTasksOnStartup(): Promise<number> {
@@ -647,6 +656,27 @@ export class SqliteAdapter implements EventStore {
     const count = result.changes
     if (count > 0) {
       console.log(`[startup] Marked ${count} stale task(s) from previous sessions`)
+    }
+    return count
+  }
+
+  /**
+   * Mark active/queued tasks from PREVIOUS sessions as stale. Called when a new
+   * Claude session starts (SessionStart event) while the server is already running.
+   * Tasks belonging to the current session are preserved.
+   * Returns the number of tasks marked stale.
+   */
+  async markStaleTasksForNewSession(currentSessionId: string): Promise<number> {
+    const result = this.db
+      .prepare(
+        `UPDATE agent_tasks SET status = 'stale', completed_at = ?
+         WHERE status IN ('active', 'queued')
+           AND (session_id IS NULL OR session_id != ?)`,
+      )
+      .run(Date.now(), currentSessionId)
+    const count = result.changes
+    if (count > 0) {
+      console.log(`[session] Marked ${count} stale task(s) from previous sessions (new session: ${currentSessionId})`)
     }
     return count
   }
