@@ -7,13 +7,14 @@ import { FernTerminal } from './components/FernTerminal'
 import { ContextWindowSidebar } from './components/ContextWindowSidebar'
 import { OperationsPage } from './components/OperationsPage'
 import { TaskPanel } from './components/TaskPanel'
+import { KanbanPage } from './components/KanbanPage'
 import { useAgentEvents } from './hooks/useAgentEvents'
 import { useOperationalData } from './hooks/useOperationalData'
 import { useAgentTasks } from './hooks/useAgentTasks'
 import { formatBubbleText } from './utils'
 import type { AgentName } from './types'
 
-type Page = 'dashboard' | 'operations'
+type Page = 'dashboard' | 'operations' | 'kanban'
 
 function formatDate(): string {
   return new Date().toLocaleDateString('en-US', {
@@ -171,6 +172,16 @@ function App() {
             >
               Health & Operations
             </button>
+            <button
+              onClick={() => setCurrentPage(currentPage === 'kanban' ? 'dashboard' : 'kanban')}
+              className={`w-full px-3 py-2 text-xs font-medium rounded-lg border transition-colors ${
+                currentPage === 'kanban'
+                  ? 'bg-fern/10 text-fern border-fern/30'
+                  : 'bg-bg-dark text-gray-400 border-border hover:bg-bg-primary'
+              }`}
+            >
+              Task Board
+            </button>
           </div>
         </aside>
 
@@ -184,6 +195,8 @@ function App() {
             tokenStats={tokenStats}
             onBack={() => setCurrentPage('dashboard')}
           />
+        ) : currentPage === 'kanban' ? (
+          <KanbanPage onBack={() => setCurrentPage('dashboard')} />
         ) : (
           <main className="flex-1 flex flex-col min-w-0 min-h-0">
 

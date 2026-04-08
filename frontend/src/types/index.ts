@@ -162,6 +162,23 @@ export interface AgentTask {
   tool_use_id: string | null
 }
 
+/** Kanban task — persistent strategic backlog */
+export type KanbanStatus = 'backlog' | 'active' | 'in_progress' | 'done'
+export type KanbanPriority = 'low' | 'medium' | 'high'
+
+export interface KanbanTask {
+  id: number
+  title: string
+  description: string | null
+  agent_name: string
+  status: KanbanStatus
+  priority: KanbanPriority
+  created_at: number
+  updated_at: number
+  activated_at: number | null
+  completed_at: number | null
+}
+
 /** Daily summary item */
 export interface DailySummaryItem {
   agent: AgentName
