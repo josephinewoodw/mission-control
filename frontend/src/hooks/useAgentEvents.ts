@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { AgentName, AgentState, AgentStatus, MCEvent } from '../types'
 import { defaultAgentState } from '../data/agents'
 import { SEED_EVENTS, SEED_AGENT_STATES } from '../data/seed-events'
+import { formatBubbleText } from '../utils'
 
 const API_BASE = '/api'
 
@@ -157,7 +158,7 @@ export function useAgentEvents(): UseAgentEventsReturn {
                 ...prevAgent,
                 status: 'working' as AgentStatus,
                 currentTask: 'Spawned by Fern',
-                highLevelTask: taskDescription || 'Spawned by Fern',
+                highLevelTask: formatBubbleText(taskDescription || 'Spawned by Fern'),
                 lastActivity: event.timestamp,
               },
               ...(prevFern ? {

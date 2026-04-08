@@ -10,6 +10,7 @@ import { TaskPanel } from './components/TaskPanel'
 import { useAgentEvents } from './hooks/useAgentEvents'
 import { useOperationalData } from './hooks/useOperationalData'
 import { useAgentTasks } from './hooks/useAgentTasks'
+import { formatBubbleText } from './utils'
 import type { AgentName } from './types'
 
 type Page = 'dashboard' | 'operations'
@@ -52,7 +53,13 @@ function App() {
         merged[name] = {
           ...agent,
           status: needsStatusUpdate ? 'working' : agent.status,
-          highLevelTask: activeTask.title || agent.highLevelTask,
+          highLevelTask: formatBubbleText(activeTask.title) || agent.highLevelTask,
+        }
+      } else if (agent.status !== 'blocked') {
+        // No active task — clear any stale task label regardless of event-stream state.
+        // Task queue is source of truth for whether real work is happening.
+        if (agent.highLevelTask !== 'Standing by...') {
+          merged[name] = { ...agent, highLevelTask: 'Standing by...' }
         }
       }
     }
