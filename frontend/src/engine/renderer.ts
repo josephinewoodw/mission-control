@@ -149,6 +149,54 @@ function drawCharacters(ctx: CanvasRenderingContext2D, characters: Character[], 
   }
 }
 
+/** Draw collaboration connection lines between agent pairs (drawn below characters) */
+function drawCollaborationLines(ctx: CanvasRenderingContext2D, characters: Character[], time: number) {
+  const halfSprite = Math.floor(SPRITE_SIZE / 2)
+  const drawn = new Set<string>()
+
+  for (const char of characters) {
+    if (!char.collaboratingWith) continue
+    const partner = characters.find(c => c.name === char.collaboratingWith)
+    if (!partner) continue
+
+    // Avoid drawing the same line twice
+    const key = [char.name, partner.name].sort().join('-')
+    if (drawn.has(key)) continue
+    drawn.add(key)
+
+    const x1 = char.x + halfSprite
+    const y1 = char.y + halfSprite
+    const x2 = partner.x + halfSprite
+    const y2 = partner.y + halfSprite
+
+    // Animated pulse: alpha oscillates with time
+    const pulse = 0.3 + 0.2 * Math.sin(time / 600)
+
+    ctx.save()
+    ctx.beginPath()
+    ctx.moveTo(x1, y1)
+    ctx.lineTo(x2, y2)
+    ctx.strokeStyle = `rgba(120, 200, 180, ${pulse})`
+    ctx.lineWidth = 1
+    ctx.setLineDash([4, 6])
+    ctx.lineDashOffset = -(time / 120) % 10
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.restore()
+
+    // Animated midpoint dot
+    const mx = (x1 + x2) / 2
+    const my = (y1 + y2) / 2
+    const dotAlpha = 0.5 + 0.3 * Math.sin(time / 400)
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(mx, my, 2.5, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(120, 200, 180, ${dotAlpha})`
+    ctx.fill()
+    ctx.restore()
+  }
+}
+
 /** Draw overlays: speech bubbles, zzz, coffee emoji, name labels, status dots */
 function drawOverlays(ctx: CanvasRenderingContext2D, characters: Character[], time: number) {
   const halfSprite = Math.floor(SPRITE_SIZE / 2)
@@ -157,13 +205,18 @@ function drawOverlays(ctx: CanvasRenderingContext2D, characters: Character[], ti
     const cx = char.x + halfSprite
     const cy = char.y
 
-    // ── Speech bubble showing high-level task ──
+    // ── Speech bubble showing high-level task (or collaboration) ──
     const rawTask = char.highLevelTask || 'Standing by...'
+    const isCollaborating = !!char.collaboratingWith && char.agentStatus === 'working'
+    const collaboratorDisplayName = isCollaborating
+      ? char.collaboratingWith!.charAt(0).toUpperCase() + char.collaboratingWith!.slice(1)
+      : null
     const taskText = char.agentStatus === 'offline' ? 'Offline' :
       char.agentStatus === 'blocked' ? 'Waiting...' :
       char.state === 'SLEEPING' ? 'Napping...' :
       char.state === 'COFFEE_RUN' || char.state === 'AT_COFFEE' ? 'Coffee break' :
       char.state === 'STRETCHING' ? 'Stretching' :
+      isCollaborating ? `With ${collaboratorDisplayName}...` :
       (rawTask.length > 25 ? rawTask.slice(0, 24) + '\u2026' : rawTask)
     if (taskText) {
       ctx.font = '7px monospace'
@@ -184,8 +237,32 @@ function drawOverlays(ctx: CanvasRenderingContext2D, characters: Character[], ti
       // Recalculate text center based on clamped bubble position
       const bubbleCx = bubbleX + bubbleW / 2
 
+      // Collaboration glow behind bubble
+      if (isCollaborating) {
+        const glowPulse = 0.35 + 0.2 * Math.sin(time / 500)
+        ctx.save()
+        ctx.shadowColor = `rgba(120, 200, 180, ${glowPulse})`
+        ctx.shadowBlur = 6
+        ctx.fillStyle = 'transparent'
+        ctx.beginPath()
+        const gr = 3
+        ctx.moveTo(bubbleX + gr, bubbleY)
+        ctx.lineTo(bubbleX + bubbleW - gr, bubbleY)
+        ctx.arcTo(bubbleX + bubbleW, bubbleY, bubbleX + bubbleW, bubbleY + gr, gr)
+        ctx.lineTo(bubbleX + bubbleW, bubbleY + bubbleH - gr)
+        ctx.arcTo(bubbleX + bubbleW, bubbleY + bubbleH, bubbleX + bubbleW - gr, bubbleY + bubbleH, gr)
+        ctx.lineTo(bubbleX + gr, bubbleY + bubbleH)
+        ctx.arcTo(bubbleX, bubbleY + bubbleH, bubbleX, bubbleY + bubbleH - gr, gr)
+        ctx.lineTo(bubbleX, bubbleY + gr)
+        ctx.arcTo(bubbleX, bubbleY, bubbleX + gr, bubbleY, gr)
+        ctx.closePath()
+        ctx.fillStyle = 'rgba(20, 40, 38, 0.92)'
+        ctx.fill()
+        ctx.restore()
+      }
+
       // Bubble background
-      ctx.fillStyle = 'rgba(20, 20, 35, 0.85)'
+      ctx.fillStyle = isCollaborating ? 'rgba(18, 38, 35, 0.92)' : 'rgba(20, 20, 35, 0.85)'
       ctx.beginPath()
       const r = 3
       ctx.moveTo(bubbleX + r, bubbleY)
@@ -209,9 +286,11 @@ function drawOverlays(ctx: CanvasRenderingContext2D, characters: Character[], ti
       ctx.closePath()
       ctx.fill()
 
-      // Border
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)'
-      ctx.lineWidth = 0.5
+      // Border — teal for collaboration, default otherwise
+      ctx.strokeStyle = isCollaborating
+        ? `rgba(120, 200, 180, ${0.5 + 0.3 * Math.sin(time / 500)})`
+        : 'rgba(255, 255, 255, 0.2)'
+      ctx.lineWidth = isCollaborating ? 0.8 : 0.5
       ctx.beginPath()
       ctx.moveTo(bubbleX + r, bubbleY)
       ctx.lineTo(bubbleX + bubbleW - r, bubbleY)
@@ -225,8 +304,8 @@ function drawOverlays(ctx: CanvasRenderingContext2D, characters: Character[], ti
       ctx.closePath()
       ctx.stroke()
 
-      // Text — centered on clamped bubble position
-      ctx.fillStyle = '#e0e0e0'
+      // Text — teal for collaboration, default otherwise
+      ctx.fillStyle = isCollaborating ? '#78c8b4' : '#e0e0e0'
       ctx.shadowColor = 'rgba(0,0,0,0.5)'
       ctx.shadowBlur = 1
       ctx.fillText(taskText, bubbleCx, bubbleY + bubbleH - padY)
@@ -321,6 +400,9 @@ export function render(
 
   // Layer 5: Characters (LPC sprites at SPRITE_SIZE=48)
   drawCharacters(ctx, characters, time)
+
+  // Layer 5.5: Collaboration lines (drawn above characters, below overlays)
+  drawCollaborationLines(ctx, characters, time)
 
   // Layer 6: Overlays (names, status, emoji)
   drawOverlays(ctx, characters, time)

@@ -27,6 +27,8 @@ export interface AgentState {
   blockedTool?: string | null
   /** Timestamp when the agent entered blocked state */
   blockedSince?: number | null
+  /** Agent this one is currently collaborating with, if any */
+  collaboratingWith?: AgentName | null
 }
 
 /** Health status for the system health panel */

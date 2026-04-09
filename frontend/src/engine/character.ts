@@ -71,6 +71,9 @@ export class Character {
   // High-level task description (shown in speech bubble)
   highLevelTask: string = 'Standing by...'
 
+  // Collaboration: name of agent this one is working with, null if not collaborating
+  collaboratingWith: AgentName | null = null
+
   constructor(name: AgentName, displayName: string, color: string) {
     this.name = name
     this.displayName = displayName

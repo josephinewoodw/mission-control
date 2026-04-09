@@ -72,6 +72,13 @@ function summarizeEvent(type: string, subtype: string | null, toolName: string |
   return subtype || type || 'Activity'
 }
 
+/** Extract any agent names mentioned in a task string */
+function extractMentionedAgents(text: string): AgentName[] {
+  const lower = text.toLowerCase()
+  const allAgents: AgentName[] = ['fern', 'scout', 'reed', 'sentinel', 'timber', 'tide']
+  return allAgents.filter(name => lower.includes(name))
+}
+
 interface UseAgentEventsReturn {
   agents: Record<string, AgentState>
   events: MCEvent[]
@@ -148,11 +155,18 @@ export function useAgentEvents(): UseAgentEventsReturn {
           activeSubagentSpawns.current.set(toolUseId, agentName)
           // Mark the subagent as working with high-level task
           const displayName = agentName.charAt(0).toUpperCase() + agentName.slice(1)
+
+          // Detect collaboration: check if the task text mentions other agents by name
+          const taskText = `${taskDescription} ${taskPrompt}`
+          const mentionedAgents = extractMentionedAgents(taskText).filter(a => a !== agentName && a !== 'fern')
+          const collaborator = mentionedAgents.length > 0 ? mentionedAgents[0] : null
+
           setAgents(prev => {
             const prevAgent = prev[agentName]
             if (!prevAgent) return prev
             const prevFern = prev['fern']
-            return {
+
+            const updates: Record<string, AgentState> = {
               ...prev,
               [agentName]: {
                 ...prevAgent,
@@ -160,6 +174,7 @@ export function useAgentEvents(): UseAgentEventsReturn {
                 currentTask: 'Spawned by Fern',
                 highLevelTask: formatBubbleText(taskDescription || 'Spawned by Fern'),
                 lastActivity: event.timestamp,
+                collaboratingWith: collaborator,
               },
               ...(prevFern ? {
                 fern: {
@@ -168,6 +183,16 @@ export function useAgentEvents(): UseAgentEventsReturn {
                 },
               } : {}),
             }
+
+            // If the spawned agent mentions a collaborator, also mark that collaborator
+            if (collaborator && prev[collaborator]) {
+              updates[collaborator] = {
+                ...prev[collaborator],
+                collaboratingWith: agentName,
+              }
+            }
+
+            return updates
           })
         }
       }
@@ -210,7 +235,9 @@ export function useAgentEvents(): UseAgentEventsReturn {
             const prevAgent = prev[spawnedAgent]
             if (!prevAgent) return prev
             const prevFern = prev['fern']
-            return {
+            // Clear collaboration on the completing agent and its former collaborator
+            const collaborator = prevAgent.collaboratingWith
+            const updates: Record<string, AgentState> = {
               ...prev,
               [spawnedAgent]: {
                 ...prevAgent,
@@ -218,6 +245,7 @@ export function useAgentEvents(): UseAgentEventsReturn {
                 currentTask: 'Task complete',
                 highLevelTask: 'Standing by...',
                 lastActivity: event.timestamp,
+                collaboratingWith: null,
               },
               ...(prevFern ? {
                 fern: {
@@ -226,6 +254,10 @@ export function useAgentEvents(): UseAgentEventsReturn {
                 },
               } : {}),
             }
+            if (collaborator && prev[collaborator]) {
+              updates[collaborator] = { ...prev[collaborator], collaboratingWith: null }
+            }
+            return updates
           })
         }
       }
@@ -242,11 +274,12 @@ export function useAgentEvents(): UseAgentEventsReturn {
           break
         }
       }
-      // Set the completed agent to idle with "Standing by..."
+      // Set the completed agent to idle with "Standing by...", clearing any collaboration
       setAgents(prev => {
         const prevAgent = prev[stoppedAgent]
         if (!prevAgent) return prev
-        return {
+        const collaborator = prevAgent.collaboratingWith
+        const updates: Record<string, AgentState> = {
           ...prev,
           [stoppedAgent]: {
             ...prevAgent,
@@ -254,8 +287,13 @@ export function useAgentEvents(): UseAgentEventsReturn {
             currentTask: 'Task complete',
             highLevelTask: 'Standing by...',
             lastActivity: event.timestamp,
+            collaboratingWith: null,
           },
         }
+        if (collaborator && prev[collaborator]) {
+          updates[collaborator] = { ...prev[collaborator], collaboratingWith: null }
+        }
+        return updates
       })
     }
 

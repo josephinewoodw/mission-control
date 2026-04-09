@@ -28,6 +28,7 @@ export function useCanvasEngine({ agents }: UseCanvasEngineOptions) {
       if (agentState) {
         char.setAgentStatus(agentState.status)
         char.highLevelTask = agentState.highLevelTask || 'Standing by...'
+        char.collaboratingWith = agentState.collaboratingWith ?? null
       }
     }
   }, [])
