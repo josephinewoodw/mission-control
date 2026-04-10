@@ -52,12 +52,7 @@
     <string>sonnet</string>
   </dict>
 
-  <key>KeepAlive</key>
-  <dict>
-    <key>SuccessfulExit</key>
-    <false/>
-  </dict>
-
+  <!-- ThrottleInterval prevents rapid re-firing if launchd wakes the job late -->
   <key>ThrottleInterval</key>
   <integer>60</integer>
 
