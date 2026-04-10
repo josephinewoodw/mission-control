@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mission Control — Sentinel Morning Health Check
+
+  Schedule: 6:00am CT daily (11:00 UTC)
+  Cron equivalent: 0 11 * * *
+
+  Installation: run cron/install.sh — or manually:
+    ln -sf "$(pwd)/plists/com.mission-control.sentinel-health-check-morning.plist" ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.mission-control.sentinel-health-check-morning.plist
+
+  Logs: ~/Library/Logs/mission-control/sentinel-health-check-morning.log
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.mission-control.sentinel-health-check-morning</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/josephinewood/mission-control/cron/scripts/sentinel-health-check-morning.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/josephinewood/fern-vault</string>
+
+  <!-- 6:00am CT = 11:00 UTC -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>11</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/josephinewood</string>
+    <key>PATH</key>
+    <string>/Users/josephinewood/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>VAULT_DIR</key>
+    <string>/Users/josephinewood/fern-vault</string>
+    <key>CLAUDE_MODEL</key>
+    <string>sonnet</string>
+  </dict>
+
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/josephinewood/Library/Logs/mission-control/sentinel-health-check-morning.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/josephinewood/Library/Logs/mission-control/sentinel-health-check-morning.log</string>
+</dict>
+</plist>

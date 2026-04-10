@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mission Control — Sentinel Nightly Security Scan
+
+  Schedule: 11:00pm CT daily (04:00 UTC next day)
+  Cron equivalent: 0 4 * * *
+
+  Installation: run cron/install.sh — or manually:
+    ln -sf "$(pwd)/plists/com.mission-control.sentinel-nightly-security-scan.plist" ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.mission-control.sentinel-nightly-security-scan.plist
+
+  Logs: ~/Library/Logs/mission-control/sentinel-nightly-security-scan.log
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.mission-control.sentinel-nightly-security-scan</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/josephinewood/mission-control/cron/scripts/sentinel-nightly-security-scan.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/josephinewood/fern-vault</string>
+
+  <!-- 11:00pm CT = 04:00 UTC (next day) -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>4</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/josephinewood</string>
+    <key>PATH</key>
+    <string>/Users/josephinewood/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>VAULT_DIR</key>
+    <string>/Users/josephinewood/fern-vault</string>
+    <key>CLAUDE_MODEL</key>
+    <string>sonnet</string>
+  </dict>
+
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/josephinewood/Library/Logs/mission-control/sentinel-nightly-security-scan.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/josephinewood/Library/Logs/mission-control/sentinel-nightly-security-scan.log</string>
+</dict>
+</plist>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mission Control — Reed Weekly Content Production
+
+  Schedule: Thursday 9:00am CT (14:00 UTC, Weekday=4)
+  Cron equivalent: 0 14 * * 4
+
+  Installation: run cron/install.sh — or manually:
+    ln -sf "$(pwd)/plists/com.mission-control.reed-weekly-content.plist" ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.mission-control.reed-weekly-content.plist
+
+  Logs: ~/Library/Logs/mission-control/reed-weekly-content.log
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.mission-control.reed-weekly-content</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/josephinewood/mission-control/cron/scripts/reed-weekly-content.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/josephinewood/fern-vault</string>
+
+  <!-- Thursday 9:00am CT = Thursday 14:00 UTC (Weekday 4 = Thursday) -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key>
+    <integer>4</integer>
+    <key>Hour</key>
+    <integer>14</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/josephinewood</string>
+    <key>PATH</key>
+    <string>/Users/josephinewood/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>VAULT_DIR</key>
+    <string>/Users/josephinewood/fern-vault</string>
+    <key>CLAUDE_MODEL</key>
+    <string>sonnet</string>
+  </dict>
+
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/josephinewood/Library/Logs/mission-control/reed-weekly-content.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/josephinewood/Library/Logs/mission-control/reed-weekly-content.log</string>
+</dict>
+</plist>

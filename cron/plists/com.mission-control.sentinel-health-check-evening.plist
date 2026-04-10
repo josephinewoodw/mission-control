@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mission Control — Sentinel Evening Health Check
+
+  Schedule: 10:00pm CT daily (03:00 UTC next day)
+  Cron equivalent: 0 3 * * *
+
+  Installation: run cron/install.sh — or manually:
+    ln -sf "$(pwd)/plists/com.mission-control.sentinel-health-check-evening.plist" ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.mission-control.sentinel-health-check-evening.plist
+
+  Logs: ~/Library/Logs/mission-control/sentinel-health-check-evening.log
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.mission-control.sentinel-health-check-evening</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/josephinewood/mission-control/cron/scripts/sentinel-health-check-evening.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/josephinewood/fern-vault</string>
+
+  <!-- 10:00pm CT = 03:00 UTC (next day) -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>3</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/josephinewood</string>
+    <key>PATH</key>
+    <string>/Users/josephinewood/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>VAULT_DIR</key>
+    <string>/Users/josephinewood/fern-vault</string>
+    <key>CLAUDE_MODEL</key>
+    <string>sonnet</string>
+  </dict>
+
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/josephinewood/Library/Logs/mission-control/sentinel-health-check-evening.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/josephinewood/Library/Logs/mission-control/sentinel-health-check-evening.log</string>
+</dict>
+</plist>

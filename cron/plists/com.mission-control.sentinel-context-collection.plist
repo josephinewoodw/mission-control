@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mission Control — Sentinel Context Collection
+
+  Schedule: every 3 hours at :17 (00:17, 03:17, 06:17, 09:17, 12:17, 15:17, 18:17, 21:17 UTC)
+  Cron equivalent: 17 */3 * * *
+
+  Installation: run cron/install.sh — or manually:
+    ln -sf "$(pwd)/plists/com.mission-control.sentinel-context-collection.plist" ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.mission-control.sentinel-context-collection.plist
+
+  Logs: ~/Library/Logs/mission-control/sentinel-context-collection.log
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.mission-control.sentinel-context-collection</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/josephinewood/mission-control/cron/scripts/sentinel-context-collection.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/josephinewood/fern-vault</string>
+
+  <!-- Every 3 hours at :17 — launchd requires one entry per trigger hour -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>17</integer></dict>
+    <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>17</integer></dict>
+    <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>17</integer></dict>
+    <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>17</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>17</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>17</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>17</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>17</integer></dict>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/josephinewood</string>
+    <key>PATH</key>
+    <string>/Users/josephinewood/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>VAULT_DIR</key>
+    <string>/Users/josephinewood/fern-vault</string>
+    <key>CLAUDE_MODEL</key>
+    <string>sonnet</string>
+  </dict>
+
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/josephinewood/Library/Logs/mission-control/sentinel-context-collection.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/josephinewood/Library/Logs/mission-control/sentinel-context-collection.log</string>
+</dict>
+</plist>
