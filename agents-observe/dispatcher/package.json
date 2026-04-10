@@ -1,0 +1,14 @@
+{
+  "name": "kanban-dispatcher",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Standalone kanban task dispatcher for Mission Control agents-observe",
+  "main": "dispatcher.js",
+  "scripts": {
+    "start": "node dispatcher.js",
+    "dry-run": "DRY_RUN=1 node dispatcher.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

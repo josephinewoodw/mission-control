@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mission Control — Kanban Dispatcher launchd plist
+
+  Installation:
+    1. Edit WorkingDirectory and LOG_DIR below if your checkout is not at ~/mission-control
+    2. Copy (or symlink) to ~/Library/LaunchAgents/:
+         cp com.mission-control.dispatcher.plist ~/Library/LaunchAgents/
+    3. Load it:
+         launchctl load ~/Library/LaunchAgents/com.mission-control.dispatcher.plist
+    4. Check it's running:
+         launchctl list | grep dispatcher
+
+  To unload:
+    launchctl unload ~/Library/LaunchAgents/com.mission-control.dispatcher.plist
+
+  Logs:
+    ~/Library/Logs/mission-control/dispatcher.log
+    ~/Library/Logs/mission-control/dispatcher-error.log
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.mission-control.dispatcher</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/Users/josephinewood/mission-control/agents-observe/dispatcher/dispatcher.js</string>
+  </array>
+
+  <!-- Working directory — must contain the repo so .claude/agents/*.md are discoverable -->
+  <key>WorkingDirectory</key>
+  <string>/Users/josephinewood/fern-vault</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>API_BASE_URL</key>
+    <string>http://localhost:4981</string>
+
+    <!-- Poll every 60 seconds -->
+    <key>POLL_INTERVAL_MS</key>
+    <string>60000</string>
+
+    <!-- Agent timeout: 10 minutes -->
+    <key>AGENT_TIMEOUT_MS</key>
+    <string>600000</string>
+
+    <!-- Max tasks running at once -->
+    <key>MAX_CONCURRENT</key>
+    <string>2</string>
+
+    <!-- Model tier for spawned agents -->
+    <key>CLAUDE_MODEL</key>
+    <string>sonnet</string>
+
+    <!-- Uncomment and set to your claude CLI path if not on PATH -->
+    <!-- <key>CLAUDE_PATH</key> -->
+    <!-- <string>/Users/josephinewood/.local/bin/claude</string> -->
+
+    <!-- Set to 1 to test polling without spawning real agents -->
+    <!-- <key>DRY_RUN</key> -->
+    <!-- <string>1</string> -->
+
+    <!-- Carry over the login keychain / PATH so claude auth works -->
+    <key>PATH</key>
+    <string>/Users/josephinewood/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+
+    <key>HOME</key>
+    <string>/Users/josephinewood</string>
+  </dict>
+
+  <!-- Restart automatically on crash -->
+  <key>KeepAlive</key>
+  <dict>
+    <!-- Only keep alive if the process exits non-zero (crash) -->
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+
+  <!-- Wait 10s before restarting after a crash -->
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <!-- Start when the user logs in -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Log files -->
+  <key>StandardOutPath</key>
+  <string>/Users/josephinewood/Library/Logs/mission-control/dispatcher.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/josephinewood/Library/Logs/mission-control/dispatcher-error.log</string>
+</dict>
+</plist>
