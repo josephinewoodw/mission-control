@@ -70,10 +70,10 @@ export function ContextWindowSidebar({ usage, tokenStats, liveTokenStats }: Cont
       </div>
 
       <div className="p-3 space-y-3">
-        {/* Weekly quota bar — pushed to /operational/context by Fern */}
+        {/* Weekly rolling usage — derived from stats-cache.json (7-day sum) */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[0.62rem] text-gray-500">Weekly quota</span>
+            <span className="text-[0.62rem] text-gray-500">7-day usage</span>
             <span className={`text-[0.62rem] font-semibold ${fillTextColor(usage.fillPercent)}`}>
               {usage.fillPercent.toFixed(1)}%
             </span>
@@ -89,7 +89,7 @@ export function ContextWindowSidebar({ usage, tokenStats, liveTokenStats }: Cont
               {formatTokens(usage.usedTokens)} used
             </span>
             <span className="text-[0.55rem] text-gray-600">
-              {formatTokens(usage.maxTokens)} limit
+              {formatTokens(usage.maxTokens)} est. cap
             </span>
           </div>
         </div>

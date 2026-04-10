@@ -51,13 +51,39 @@ export function useOperationalData(connected: boolean): OperationalData {
   useEffect(() => {
     async function pollStats() {
       try {
-        const [statsRes, liveRes] = await Promise.all([
+        const [statsRes, liveRes, ctxRes] = await Promise.all([
           fetch(`${API_BASE}/stats`),
           fetch(`${API_BASE}/stats/live`),
+          fetch(`${API_BASE}/operational/context`),
         ])
         if (statsRes.ok) {
           const data = await statsRes.json()
-          if (!data.error) setTokenStats(data)
+          if (!data.error) {
+            setTokenStats(data)
+
+            // Derive weekly quota from stats-cache when hooks aren't pushing
+            // real context data (maxTokens === 0 means no hook data).
+            const ctxData = ctxRes.ok ? await ctxRes.json() : null
+            if (!ctxData || ctxData.maxTokens === 0) {
+              // Sum the last 7 calendar days from recentDays
+              const today = new Date().toISOString().slice(0, 10)
+              const sevenDaysAgo = new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10)
+              const weekTotal = (data.recentDays as Array<{ date: string; total: number }>)
+                .filter((d) => d.date >= sevenDaysAgo && d.date <= today)
+                .reduce((sum: number, d: { date: string; total: number }) => sum + d.total, 0)
+
+              // Claude Code Max plan: ~25M tokens/week estimated cap
+              // Expressed as weekly rolling usage (not a hard limit — just for display)
+              const WEEKLY_LIMIT = 25_000_000
+              setContext({
+                maxTokens: WEEKLY_LIMIT,
+                usedTokens: weekTotal,
+                fillPercent: Math.min((weekTotal / WEEKLY_LIMIT) * 100, 100),
+              })
+            } else {
+              setContext(ctxData)
+            }
+          }
         }
         if (liveRes.ok) {
           const liveData = await liveRes.json()
