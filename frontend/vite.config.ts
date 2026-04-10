@@ -11,6 +11,10 @@ export default defineConfig({
         target: 'http://localhost:4981',
         changeOrigin: true,
       },
+      '/analytics': {
+        target: 'http://localhost:4982',
+        changeOrigin: true,
+      },
     },
   },
 })

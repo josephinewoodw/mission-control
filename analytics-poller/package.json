@@ -1,0 +1,14 @@
+{
+  "name": "analytics-poller",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.8.0",
+    "express": "^4.21.2",
+    "cors": "^2.8.5"
+  }
+}
