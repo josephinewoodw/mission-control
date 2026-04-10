@@ -286,7 +286,7 @@ interface ColumnProps {
   tasks: KanbanTask[]
   isDragOver: boolean
   onDragOver: (e: React.DragEvent, status: KanbanStatus) => void
-  onDragLeave: () => void
+  onDragLeave: (e: React.DragEvent, status: KanbanStatus) => void
   onDrop: (e: React.DragEvent, status: KanbanStatus) => void
   onDragStart: (e: React.DragEvent, task: KanbanTask) => void
   onEdit: (task: KanbanTask) => void
@@ -319,7 +319,7 @@ function KanbanColumn({
         }
       `}
       onDragOver={(e) => onDragOver(e, status)}
-      onDragLeave={onDragLeave}
+      onDragLeave={(e) => onDragLeave(e, status)}
       onDrop={(e) => onDrop(e, status)}
     >
       {/* Column header */}
@@ -387,7 +387,13 @@ export function KanbanPage({ onBack }: KanbanPageProps) {
     setDragOverColumn(status)
   }
 
-  function handleDragLeave() {
+  function handleDragLeave(e: React.DragEvent, _status: KanbanStatus) {
+    // Only clear the drag-over state if the pointer has left the column entirely.
+    // When dragging over child elements (task cards), the browser fires dragleave
+    // on the column and dragenter on the card — relatedTarget will be the card,
+    // which is still inside currentTarget. Ignoring those keeps the highlight stable
+    // and ensures onDrop fires correctly when releasing over a card.
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return
     setDragOverColumn(null)
   }
 
