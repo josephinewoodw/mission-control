@@ -59,18 +59,23 @@ export function extractHookText(caption) {
 
 /**
  * Classify hook type based on hook text content.
+ * Priority order (first match wins):
+ * Question → Warning → Statistic → Scenario → Callback → Exclamation →
+ * Direct Address → Contrarian → Personal → Statement → Other
  */
 export function classifyHookType(hookText) {
   if (!hookText) return 'Other'
   const lower = hookText.toLowerCase().trim()
+  const first40 = lower.substring(0, 40)
 
   // Question — starts with interrogative
   if (/^(do you|did you|why |what |how |would |are you|have you|is |can |could |should |will )/.test(lower)) {
     return 'Question'
   }
 
-  // Warning — strong warning signals
-  if (/\b(don't|stop|never|warning|dangerous|threat|risk|danger|careful)\b/.test(lower)) {
+  // Warning — strong threat/caution signals (not just casual "don't")
+  if (/\b(stop |never |warning|dangerous|threat|risk|danger|careful|watch out|beware)\b/.test(lower) ||
+      /^(don't|never )/.test(lower)) {
     return 'Warning'
   }
 
@@ -79,9 +84,42 @@ export function classifyHookType(hookText) {
     return 'Statistic'
   }
 
-  // Personal — starts with I/My/We
-  if (/^(i |my |we )/.test(lower)) {
+  // Scenario — hypothetical/conditional opener
+  if (/^(if |imagine |picture this|what if )/.test(lower)) {
+    return 'Scenario'
+  }
+
+  // Callback — series continuation or reference to prior content
+  if (/\b(chapter \d|part \d|we'?re back|last time|episode \d)\b/.test(lower)) {
+    return 'Callback'
+  }
+
+  // Exclamation — high energy with !! or starts with !
+  if (/!!/.test(hookText) || hookText.trim().startsWith('!')) {
+    return 'Exclamation'
+  }
+
+  // Direct Address — speaks to "you" directly (not a question)
+  // Check for "your" or "you " in first 10 words
+  const first10words = lower.split(/\s+/).slice(0, 10).join(' ')
+  if (/\byour\b|\byou\b/.test(first10words)) {
+    return 'Direct Address'
+  }
+
+  // Contrarian — negates conventional wisdom
+  if (/\b(isn'?t|aren'?t|not a |don'?t need|won'?t|never)\b/.test(lower)) {
+    return 'Contrarian'
+  }
+
+  // Personal — "I" or "my" in first 40 characters (broader than just starting with it)
+  if (/\bi |\bmy /.test(first40)) {
     return 'Personal'
+  }
+
+  // Statement — any declarative opener that doesn't match above
+  // (If it has a verb and makes an assertion, it's a Statement)
+  if (lower.length > 10) {
+    return 'Statement'
   }
 
   return 'Other'
