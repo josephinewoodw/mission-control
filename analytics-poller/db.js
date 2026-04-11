@@ -163,11 +163,16 @@ export function upsertFollowerSnapshot(snapshot) {
   `).run(snapshot)
 }
 
-export function getFollowerSnapshots(limit = 90) {
+export function getFollowerSnapshots(days = 90) {
   const db = getDb()
+  // Return all snapshots from the last N days (not a row limit)
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - days)
   return db.prepare(`
-    SELECT * FROM follower_snapshots ORDER BY captured_at DESC LIMIT ?
-  `).all(limit)
+    SELECT * FROM follower_snapshots
+    WHERE captured_at >= ?
+    ORDER BY captured_at DESC
+  `).all(cutoff.toISOString())
 }
 
 export function getLatestFollowerSnapshot() {

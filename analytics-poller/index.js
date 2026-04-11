@@ -473,56 +473,110 @@ function computeForecast(snapshots, account) {
   const sorted = [...snapshots].sort((a, b) => new Date(a.captured_at) - new Date(b.captured_at))
 
   // ─── Compute day-over-day deltas from snapshot data ───────────────────────
-  // Group snapshots by day, take the max follower count per day (end-of-day)
-  const byDay = new Map()
+  // Group snapshots by day, selecting the best representative count per day.
+  // Priority: real 15-min poll data (ISO Z timestamps) over reconstructed
+  // delta-history data (UTC offset timestamps like +0000). If a day has real
+  // 15-min data, use the last real snapshot. Otherwise fall back to the
+  // reconstructed daily record.
+  const byDayReal = new Map()   // days with real 15-min poll snapshots
+  const byDayFallback = new Map() // days with only reconstructed data
   for (const s of sorted) {
     const day = s.captured_at.substring(0, 10)
-    if (!byDay.has(day) || s.follower_count > byDay.get(day)) {
-      byDay.set(day, s.follower_count)
+    const isReal = s.captured_at.endsWith('Z') // real 15-min polls use Z suffix
+    if (isReal) {
+      const existing = byDayReal.get(day)
+      if (!existing || s.captured_at > existing.captured_at) {
+        byDayReal.set(day, { captured_at: s.captured_at, follower_count: s.follower_count })
+      }
+    } else {
+      // Reconstructed data — use max follower_count as best estimate
+      const existing = byDayFallback.get(day)
+      if (!existing || s.follower_count > existing.follower_count) {
+        byDayFallback.set(day, { captured_at: s.captured_at, follower_count: s.follower_count })
+      }
     }
   }
-  const dailyEntries = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))
 
-  // Compute day-over-day deltas
+  // Merge: prefer real data per day
+  const byDay = new Map([...byDayFallback, ...byDayReal]) // real overwrites fallback
+  const dailyEntries = [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, v]) => [day, v.follower_count])
+
+  // Build a set of days that have real 15-min poll data (not just reconstructed)
+  const realDays = new Set([...byDayReal.keys()])
+
+  // Compute day-over-day deltas from consecutive real-data days only.
+  // We only count a delta when BOTH the current and previous day have real data,
+  // ensuring we don't mix reconstructed (unreliable) counts into the rate calculation.
   const dailyDeltas = []
   for (let i = 1; i < dailyEntries.length; i++) {
-    const delta = dailyEntries[i][1] - dailyEntries[i - 1][1]
-    if (delta >= 0) dailyDeltas.push(delta) // ignore negative (data correction artifacts)
+    const prevDay = new Date(dailyEntries[i - 1][0])
+    const currDay = new Date(dailyEntries[i][0])
+    const dayGap = (currDay - prevDay) / (1000 * 60 * 60 * 24)
+    // Only use consecutive days (gap <= 2 to handle timezone edge cases)
+    if (dayGap <= 2) {
+      const delta = dailyEntries[i][1] - dailyEntries[i - 1][1]
+      if (delta >= 0) dailyDeltas.push(delta / dayGap) // normalize to per-day rate
+    }
   }
 
-  // ─── Average daily growth rate scenarios ─────────────────────────────────
-  // Moderate: overall average daily growth across all available data
-  let moderateRate = 1
-  if (dailyDeltas.length >= 1) {
-    moderateRate = dailyDeltas.reduce((a, b) => a + b, 0) / dailyDeltas.length
+  // For the moving average, prefer real-data deltas (consecutive real days).
+  // Fall back to all daily deltas if we don't have enough real-data deltas.
+  const realDayEntries = dailyEntries.filter(([day]) => realDays.has(day))
+  const realDayDeltas = []
+  for (let i = 1; i < realDayEntries.length; i++) {
+    const prevDay = new Date(realDayEntries[i - 1][0])
+    const currDay = new Date(realDayEntries[i][0])
+    const dayGap = (currDay - prevDay) / (1000 * 60 * 60 * 24)
+    if (dayGap <= 2) {
+      const delta = realDayEntries[i][1] - realDayEntries[i - 1][1]
+      if (delta >= 0) realDayDeltas.push(delta / dayGap)
+    }
+  }
+
+  // ─── 7-day moving average model ──────────────────────────────────────────
+  // Use real-data deltas if available (more reliable), otherwise fall back
+  // to all daily deltas. Capped at last 7 days.
+  const deltaSource = realDayDeltas.length >= 1 ? realDayDeltas : dailyDeltas
+  const recentDeltas = deltaSource.slice(-7)
+
+  function mean(arr) {
+    if (arr.length === 0) return 0
+    return arr.reduce((a, b) => a + b, 0) / arr.length
+  }
+
+  function stddev(arr, avg) {
+    if (arr.length < 2) return 0
+    const variance = arr.reduce((sum, v) => sum + Math.pow(v - avg, 2), 0) / arr.length
+    return Math.sqrt(variance)
+  }
+
+  // Moving average base rate from last 7 days
+  let movingAvg = 1
+  let sigma = 0
+  if (recentDeltas.length >= 1) {
+    movingAvg = mean(recentDeltas)
+    sigma = stddev(recentDeltas, movingAvg)
   } else if (dailyEntries.length >= 2) {
     // Fallback: divide total growth by span days
     const spanDays = (new Date(dailyEntries[dailyEntries.length - 1][0]) - new Date(dailyEntries[0][0])) / (1000 * 60 * 60 * 24)
     if (spanDays > 0) {
-      moderateRate = (dailyEntries[dailyEntries.length - 1][1] - dailyEntries[0][1]) / spanDays
+      movingAvg = (dailyEntries[dailyEntries.length - 1][1] - dailyEntries[0][1]) / spanDays
     }
   }
-  if (moderateRate <= 0) moderateRate = 1
+  if (movingAvg <= 0) movingAvg = 1
 
-  // Conservative: average of the slower days (bottom half, or minimum of 1)
-  let conservativeRate = moderateRate * 0.5
-  if (dailyDeltas.length >= 4) {
-    const sorted30 = [...dailyDeltas].sort((a, b) => a - b)
-    const worstN = Math.max(1, Math.floor(dailyDeltas.length * 0.4))
-    const worst = sorted30.slice(0, worstN)
-    conservativeRate = worst.reduce((a, b) => a + b, 0) / worst.length
-  }
-  if (conservativeRate <= 0) conservativeRate = Math.max(1, moderateRate * 0.3)
-
-  // Optimistic: average of the best days (top 25%, or top viral days)
-  let optimisticRate = moderateRate * 2
-  if (dailyDeltas.length >= 4) {
-    const sorted30 = [...dailyDeltas].sort((a, b) => b - a)
-    const bestN = Math.max(1, Math.floor(dailyDeltas.length * 0.25))
-    const best = sorted30.slice(0, bestN)
-    optimisticRate = best.reduce((a, b) => a + b, 0) / best.length
-  }
-  if (optimisticRate <= moderateRate) optimisticRate = moderateRate * 2
+  // Three scenarios based on moving average ± standard deviation
+  // Moderate: 7-day moving average
+  let moderateRate = movingAvg
+  // Conservative: moving average minus one standard deviation (floor at 1)
+  let conservativeRate = Math.max(1, movingAvg - sigma)
+  // Optimistic: moving average plus one standard deviation
+  let optimisticRate = movingAvg + sigma
+  // Ensure scenarios are distinct and ordered
+  if (optimisticRate <= moderateRate) optimisticRate = moderateRate * 1.5
+  if (conservativeRate >= moderateRate) conservativeRate = moderateRate * 0.6
 
   const milestones = [5000, 10000, 25000, 50000, 100000]
 
@@ -575,9 +629,12 @@ function computeForecast(snapshots, account) {
     conservativeRate: Math.round(conservativeRate * 100) / 100,
     moderateRate: Math.round(moderateRate * 100) / 100,
     optimisticRate: Math.round(optimisticRate * 100) / 100,
+    movingAvgDays: recentDeltas.length,
     milestoneTable,
     projectionPoints,
-    disclaimer: null,
+    disclaimer: recentDeltas.length < 3
+      ? `Forecast based on ${recentDeltas.length} day(s) of data — rates will improve as more snapshots are collected`
+      : null,
   }
 }
 
@@ -636,13 +693,14 @@ app.patch('/analytics/post/:id/category', (req, res) => {
   }
 })
 
-// GET /analytics/followers — follower snapshots and stats
+// GET /analytics/followers — follower snapshots, stats, and forecast
 app.get('/analytics/followers', (req, res) => {
   try {
     const snapshots = getFollowerSnapshots(90)
     const account = getLatestAccountSnapshot()
     const stats = computeFollowerStats(snapshots, account)
-    res.json({ snapshots: snapshots.reverse(), stats, account })
+    const forecast = computeForecast(snapshots, account)
+    res.json({ snapshots: snapshots.reverse(), stats, account, forecast })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
