@@ -32,10 +32,22 @@ function initSchema() {
       permalink TEXT,
       published_at TEXT,
       category TEXT DEFAULT 'Uncategorized',
+      category_manual INTEGER DEFAULT 0,
       series TEXT,
       slug TEXT,
       thumbnail_url TEXT
     );
+  `)
+
+  // Migration: add category_manual column if it doesn't exist (for existing DBs)
+  const cols = db.prepare("PRAGMA table_info(posts)").all()
+  const colNames = cols.map(c => c.name)
+  if (!colNames.includes('category_manual')) {
+    db.exec('ALTER TABLE posts ADD COLUMN category_manual INTEGER DEFAULT 0')
+    console.log('[db] Migrated: added category_manual column to posts')
+  }
+
+  db.exec(`
 
     CREATE TABLE IF NOT EXISTS post_metrics (
       post_id TEXT REFERENCES posts(id),
@@ -100,7 +112,36 @@ export function upsertPost(post) {
 
 export function updatePostCategory(postId, category) {
   const db = getDb()
-  db.prepare('UPDATE posts SET category = ? WHERE id = ?').run(category, postId)
+  // Mark as manually set so backfill won't overwrite it
+  db.prepare('UPDATE posts SET category = ?, category_manual = 1 WHERE id = ?').run(category, postId)
+}
+
+/**
+ * Re-run auto-categorization on all posts that haven't been manually categorized.
+ * Returns count of posts updated.
+ */
+export function recategorizePosts(suggestCategoryFn, classifyHookTypeFn, extractHookTextFn) {
+  const db = getDb()
+  const posts = db.prepare('SELECT id, caption, hook_text FROM posts WHERE category_manual = 0 OR category_manual IS NULL').all()
+  let updated = 0
+
+  const updateStmt = db.prepare(`
+    UPDATE posts SET category = @category, hook_text = @hook_text, hook_type = @hook_type
+    WHERE id = @id AND (category_manual = 0 OR category_manual IS NULL)
+  `)
+
+  const updateMany = db.transaction((posts) => {
+    for (const post of posts) {
+      const hookText = extractHookTextFn(post.caption)
+      const category = suggestCategoryFn(post.caption)
+      const hookType = classifyHookTypeFn(hookText)
+      const result = updateStmt.run({ id: post.id, category, hook_text: hookText, hook_type: hookType })
+      if (result.changes > 0) updated++
+    }
+  })
+
+  updateMany(posts)
+  return updated
 }
 
 export function getAllPosts() {

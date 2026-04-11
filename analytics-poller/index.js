@@ -36,6 +36,7 @@ import {
   getLatestAccountSnapshot,
   updatePostCategory,
   getLatestRateLimit,
+  recategorizePosts,
 } from './db.js'
 
 import {
@@ -156,6 +157,11 @@ async function runBackfill() {
     for (const post of posts) {
       storePost(post)
     }
+
+    // Re-run categorizer on all non-manually-set posts so new keywords/categories apply
+    const recatCount = recategorizePosts(suggestCategory, classifyHookType, extractHookText)
+    console.log(`[poller] Re-categorized ${recatCount} posts with updated keyword rules`)
+
     backfillDone = true
     lastError = null
     console.log(`[poller] Backfill complete: ${posts.length} posts stored`)
@@ -650,6 +656,16 @@ app.get('/analytics/status', (req, res) => {
 app.post('/analytics/backfill', async (req, res) => {
   res.json({ ok: true, message: 'Backfill started' })
   runBackfill()
+})
+
+// POST /analytics/recategorize — re-run auto-categorizer on non-manual posts (no API fetch)
+app.post('/analytics/recategorize', (req, res) => {
+  try {
+    const count = recategorizePosts(suggestCategory, classifyHookType, extractHookText)
+    res.json({ ok: true, updated: count, message: `Re-categorized ${count} posts` })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // ─── Start ────────────────────────────────────────────────────────────────────
