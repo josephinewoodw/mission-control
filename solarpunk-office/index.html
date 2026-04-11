@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solarpunk Office</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .scene {
+      position: relative;
+      width: 1456px;
+      height: 816px;
+      /* Scale to fit viewport while preserving aspect ratio */
+      transform-origin: center center;
+      /* White base needed for multiply blend mode to work correctly */
+      background: #ffffff;
+    }
+
+    .layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      /* All layers have white backgrounds (not transparent).
+         multiply blend mode: white areas become invisible,
+         colored artwork stacks correctly over layers below. */
+      mix-blend-mode: multiply;
+    }
+
+    /* ----------------------------------------------------------------
+       Z-ORDER (bottom to top):
+       1. sky-clouds     — background sky
+       2. background     — building structure
+       3. floor          — ground plane
+       4. monitors       — desk monitors (below tree/awnings for depth)
+       5. tree           — central tree (in front of building, behind awnings)
+       6. left-awnings   — left side awnings
+       7. right-awnings  — right side awnings
+    ---------------------------------------------------------------- */
+
+    #sky-clouds {
+      z-index: 1;
+      /* Base layer — no blend mode needed. This is the foundation. */
+      mix-blend-mode: normal;
+      /* Clouds drift via a slow translate, looping.
+         Amplitude is small (22px) so clouds barely shift — lofi ambient feel. */
+      animation: cloudDrift 45s linear infinite;
+    }
+
+    #background {
+      z-index: 2;
+    }
+
+    #floor {
+      z-index: 3;
+    }
+
+    #monitors {
+      z-index: 4;
+    }
+
+    #tree {
+      z-index: 5;
+      /* Sway from trunk base — trunk base is ~center-x, ~85% down */
+      transform-origin: 50% 88%;
+      animation: treeSway 9s ease-in-out infinite;
+    }
+
+    #left-awnings {
+      z-index: 6;
+      /* Awnings are in the left ~25% of the frame.
+         Pivot from their attachment points — roughly top-left of each awning.
+         Using a transform-origin near the left edge, upper area. */
+      transform-origin: 8% 20%;
+      animation: awningSwayLeft 6.5s ease-in-out infinite;
+    }
+
+    #right-awnings {
+      z-index: 7;
+      /* Right awnings mirror — pivot from right edge, upper area */
+      transform-origin: 92% 20%;
+      animation: awningSwayRight 7.2s ease-in-out infinite;
+      /* Offset so left and right don't sway in sync */
+      animation-delay: -2.8s;
+    }
+
+    /* ----------------------------------------------------------------
+       ANIMATIONS — all extremely subtle. Barely perceptible, lofi ambient.
+    ---------------------------------------------------------------- */
+
+    /* Cloud drift: slow horizontal translate. The sky image is wider than
+       needed in the cloud region so a ~1.5% shift doesn't reveal edges. */
+    @keyframes cloudDrift {
+      0% {
+        transform: translateX(0px);
+      }
+      50% {
+        transform: translateX(-22px);
+      }
+      100% {
+        transform: translateX(0px);
+      }
+    }
+
+    /* Tree canopy sway: very gentle rotation, pivoting at trunk base */
+    @keyframes treeSway {
+      0% {
+        transform: rotate(0deg);
+      }
+      25% {
+        transform: rotate(0.6deg);
+      }
+      75% {
+        transform: rotate(-0.5deg);
+      }
+      100% {
+        transform: rotate(0deg);
+      }
+    }
+
+    /* Left awning sway */
+    @keyframes awningSwayLeft {
+      0% {
+        transform: rotate(0deg);
+      }
+      30% {
+        transform: rotate(0.4deg);
+      }
+      70% {
+        transform: rotate(-0.35deg);
+      }
+      100% {
+        transform: rotate(0deg);
+      }
+    }
+
+    /* Right awning sway — slightly different easing feel */
+    @keyframes awningSwayRight {
+      0% {
+        transform: rotate(0deg);
+      }
+      35% {
+        transform: rotate(-0.4deg);
+      }
+      65% {
+        transform: rotate(0.3deg);
+      }
+      100% {
+        transform: rotate(0deg);
+      }
+    }
+  </style>
+  <script>
+    // Scale scene to fit the viewport, maintaining 1456x816 aspect ratio
+    function scaleScene() {
+      const scene = document.querySelector('.scene');
+      if (!scene) return;
+      const scaleX = window.innerWidth / 1456;
+      const scaleY = window.innerHeight / 816;
+      const scale = Math.min(scaleX, scaleY);
+      scene.style.transform = `scale(${scale})`;
+    }
+    window.addEventListener('resize', scaleScene);
+    window.addEventListener('load', scaleScene);
+  </script>
+</head>
+<body>
+  <div class="scene">
+    <!-- Layer 1: Sky and clouds (animated drift) -->
+    <img id="sky-clouds" class="layer" src="sky%20and%20clouds.png" alt="">
+
+    <!-- Layer 2: Background structure (static) -->
+    <img id="background" class="layer" src="background%20static.png" alt="">
+
+    <!-- Layer 3: Floor / ground plane (static) -->
+    <img id="floor" class="layer" src="floor.png" alt="">
+
+    <!-- Layer 4: Monitor screens OFF (static, behind tree for depth) -->
+    <img id="monitors" class="layer" src="monitor%20screens%20OFF.png" alt="">
+
+    <!-- Layer 5: Central tree (sway animation) -->
+    <img id="tree" class="layer" src="tree.png" alt="">
+
+    <!-- Layer 6: Left awnings (subtle sway) -->
+    <img id="left-awnings" class="layer" src="left%20awnings.png" alt="">
+
+    <!-- Layer 7: Right awnings (subtle sway, offset timing) -->
+    <img id="right-awnings" class="layer" src="right%20awnings.png" alt="">
+  </div>
+</body>
+</html>
