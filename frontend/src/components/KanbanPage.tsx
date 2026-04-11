@@ -1,6 +1,6 @@
 // components/KanbanPage.tsx
 // Persistent kanban board for strategic agent task backlog.
-// Columns: Backlog → Active → In Progress → Done
+// Columns: Queued → In Progress → Pending → Completed
 // Drag-and-drop between columns using HTML5 native drag API.
 // Agent filter, create task form, click-to-edit cards.
 
@@ -12,13 +12,13 @@ import type { KanbanTask, KanbanStatus, KanbanPriority, AgentName } from '../typ
 
 const AGENT_NAMES: AgentName[] = ['fern', 'scout', 'reed', 'sentinel', 'timber', 'tide']
 
-const COLUMN_ORDER: KanbanStatus[] = ['backlog', 'active', 'in_progress', 'done']
+const COLUMN_ORDER: KanbanStatus[] = ['backlog', 'in_progress', 'active', 'done']
 
 const COLUMN_LABELS: Record<KanbanStatus, string> = {
-  backlog: 'Backlog',
+  backlog: 'Queued',
   active: 'Pending',
   in_progress: 'In Progress',
-  done: 'Done',
+  done: 'Completed',
 }
 
 const COLUMN_COLORS: Record<KanbanStatus, string> = {
@@ -246,10 +246,10 @@ function TaskModal({ task, onSave, onDelete, onClose, isNew = false }: TaskModal
                 onChange={e => setStatus(e.target.value as KanbanStatus)}
                 className="w-full px-3 py-2 bg-bg-dark border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:border-fern/50"
               >
-                <option value="backlog">Backlog</option>
-                <option value="active">Active</option>
+                <option value="backlog">Queued</option>
                 <option value="in_progress">In Progress</option>
-                <option value="done">Done</option>
+                <option value="active">Pending (needs help)</option>
+                <option value="done">Completed</option>
               </select>
             </div>
           )}
@@ -341,7 +341,7 @@ function KanbanColumn({
       <div className="flex-1 overflow-y-auto feed-scroll p-3 space-y-2 min-h-[60px]">
         {filtered.length === 0 && (
           <div className={`text-[0.65rem] text-gray-600 italic text-center py-4 ${isDragOver ? 'text-gray-500' : ''}`}>
-            {isDragOver ? 'Release to drop' : status === 'done' ? 'Nothing completed yet' : 'No tasks'}
+            {isDragOver ? 'Release to drop' : status === 'done' ? 'Nothing completed yet' : status === 'backlog' ? 'No queued tasks' : 'No tasks'}
           </div>
         )}
         {filtered.map(task => (
@@ -463,7 +463,7 @@ export function KanbanPage({ onBack }: KanbanPageProps) {
           <div className="h-4 w-px bg-border" />
           <div>
             <h2 className="text-sm font-semibold text-gray-200">Task Board</h2>
-            <p className="text-[0.62rem] text-gray-500 mt-0.5">Strategic backlog · drag cards to change status</p>
+            <p className="text-[0.62rem] text-gray-500 mt-0.5">Queued → In Progress → Pending → Completed · drag to move</p>
           </div>
         </div>
 
