@@ -4,12 +4,13 @@
 import React, { useState } from 'react'
 import type { Post } from '../../hooks/useAnalyticsData'
 
-const CATEGORIES = ['Warning', 'Educational', 'Current Events', 'Opinion', 'Other', 'Uncategorized']
+const CATEGORIES = ['Warning', 'Educational', 'Current Events', 'Tech Drama', 'Opinion', 'Other', 'Uncategorized']
 
 const CATEGORY_COLORS: Record<string, string> = {
   'Warning': 'bg-red-500/20 text-red-300 border-red-500/30',
   'Educational': 'bg-blue-500/20 text-blue-300 border-blue-500/30',
   'Current Events': 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+  'Tech Drama': 'bg-rose-500/20 text-rose-300 border-rose-500/30',
   'Opinion': 'bg-purple-500/20 text-purple-300 border-purple-500/30',
   'Other': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
   'Uncategorized': 'bg-gray-600/20 text-gray-500 border-gray-600/30',

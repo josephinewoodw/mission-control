@@ -1,6 +1,6 @@
 // categorize.js — Auto-categorization and hook extraction logic
 
-const CATEGORIES = ['Warning', 'Educational', 'Current Events', 'Opinion', 'Other']
+const CATEGORIES = ['Warning', 'Educational', 'Current Events', 'Tech Drama', 'Opinion', 'Other']
 
 /**
  * Auto-suggest a category based on caption text (keyword matching).
@@ -15,8 +15,13 @@ export function suggestCategory(caption) {
     return 'Warning'
   }
 
+  // Tech Drama — gossip, controversy, named figures in drama context
+  if (/\b(drama|fighting|gossip|keeping up|chapter \d|altman|ronan farrow|farrow|betrayal|coup|supervillain|fired by|fired from|ousted)\b/.test(lower)) {
+    return 'Tech Drama'
+  }
+
   // Current events — company names
-  if (/\b(chatgpt|openai|google|meta|grok|xai|anthropic|gemini|copilot|sam altman|elon|amazon|microsoft)\b/.test(lower)) {
+  if (/\b(chatgpt|openai|google|meta|grok|xai|anthropic|gemini|copilot|sam altman|elon|musk|amazon|microsoft)\b/.test(lower)) {
     return 'Current Events'
   }
 

@@ -42,7 +42,6 @@ import {
   fetchAllPosts,
   fetchRecentPostMetrics,
   fetchAccountSnapshot,
-  fetchFollowerDeltaHistory,
   extractInsights,
 } from './instagram.js'
 
@@ -64,9 +63,13 @@ let pollCounts = {
   olderPosts: 0,
   archivePosts: 0,
   followerSnapshot: 0,
-  followerDelta: 0,
   accountSnapshot: 0,
 }
+
+// NOTE: IG API follower_count daily deltas were removed from the forecast pipeline.
+// The API returns ~31 total followers over 30 days for this account, while the actual
+// count grew from ~100 to 3,820+ in the same period. The API data is completely unreliable.
+// Forecast growth rates are derived solely from real 15-minute poll snapshots in the DB.
 
 // ─── Data Processing ──────────────────────────────────────────────────────────
 
@@ -223,49 +226,11 @@ async function pollFollowerSnapshot() {
   }
 }
 
-async function pollFollowerDeltaHistory() {
-  try {
-    const deltas = await fetchFollowerDeltaHistory()
-
-    // Get current follower count to anchor reconstruction
-    const latestAccount = getLatestAccountSnapshot()
-    const currentCount = latestAccount?.followers_count || 100 // fallback to known baseline
-
-    // Reconstruct absolute counts by working backwards from current
-    // deltas are ordered oldest-to-newest from API
-    const sorted = [...deltas].sort((a, b) => new Date(a.date) - new Date(b.date))
-
-    // Work forward from 30 days ago using baseline
-    // The API gives net daily change; we need to reconstruct absolute count
-    // Strategy: use current count and work backwards through deltas
-    let runningCount = currentCount
-    const reversedDeltas = [...sorted].reverse()
-
-    for (const item of reversedDeltas) {
-      upsertFollowerSnapshot({
-        captured_at: item.date,
-        follower_count: runningCount,
-        daily_delta: item.delta,
-      })
-      runningCount -= item.delta // working backwards
-    }
-
-    pollCounts.followerDelta++
-    lastError = null
-    console.log(`[poller] Follower delta history stored: ${deltas.length} days`)
-  } catch (err) {
-    lastError = err.message
-    console.error('[poller] Follower delta history failed:', err.message)
-  }
-}
-
 // ─── Polling Scheduler ────────────────────────────────────────────────────────
 
 function startPolling() {
   // Initial backfill then start tiered polling
   runBackfill().then(() => {
-    // After backfill, also pull follower history
-    pollFollowerDeltaHistory()
     pollFollowerSnapshot()
   })
 
@@ -280,19 +245,6 @@ function startPolling() {
 
   // Every 6 hours: full archive backfill (catches any missed posts)
   setInterval(runBackfill, 6 * 60 * 60 * 1000)
-
-  // Daily at midnight: follower delta history
-  function scheduleFollowerDeltaDaily() {
-    const now = new Date()
-    const midnight = new Date()
-    midnight.setHours(24, 0, 0, 0)
-    const msUntilMidnight = midnight - now
-    setTimeout(() => {
-      pollFollowerDeltaHistory()
-      setInterval(pollFollowerDeltaHistory, 24 * 60 * 60 * 1000)
-    }, msUntilMidnight)
-  }
-  scheduleFollowerDeltaDaily()
 }
 
 // ─── Analytics API Computation ────────────────────────────────────────────────
@@ -470,76 +422,58 @@ function computeFollowerStats(snapshots, account) {
 
 function computeForecast(snapshots, account) {
   const current = account?.followers_count || 100
-  const sorted = [...snapshots].sort((a, b) => new Date(a.captured_at) - new Date(b.captured_at))
 
-  // ─── Compute day-over-day deltas from snapshot data ───────────────────────
-  // Group snapshots by day, selecting the best representative count per day.
-  // Priority: real 15-min poll data (ISO Z timestamps) over reconstructed
-  // delta-history data (UTC offset timestamps like +0000). If a day has real
-  // 15-min data, use the last real snapshot. Otherwise fall back to the
-  // reconstructed daily record.
-  const byDayReal = new Map()   // days with real 15-min poll snapshots
-  const byDayFallback = new Map() // days with only reconstructed data
+  // ─── Growth rate source: real poll snapshots only ─────────────────────────
+  // The IG API follower_count insight (period=day) returns 0 for most days and
+  // doesn't capture viral growth events. Its 30-day sum (31 followers) doesn't
+  // match reality (3,820 followers). It is not usable for rate calculation.
+  //
+  // We use day-over-day deltas from the 15-min real poll snapshots (Z timestamps)
+  // as the only reliable source of truth.
+
+  const sorted = [...snapshots]
+    .filter(s => s.captured_at.endsWith('Z'))
+    .sort((a, b) => new Date(a.captured_at) - new Date(b.captured_at))
+
+  // Group by day — use last snapshot of each day (end-of-day count)
+  const byDay = new Map()
   for (const s of sorted) {
     const day = s.captured_at.substring(0, 10)
-    const isReal = s.captured_at.endsWith('Z') // real 15-min polls use Z suffix
-    if (isReal) {
-      const existing = byDayReal.get(day)
-      if (!existing || s.captured_at > existing.captured_at) {
-        byDayReal.set(day, { captured_at: s.captured_at, follower_count: s.follower_count })
-      }
-    } else {
-      // Reconstructed data — use max follower_count as best estimate
-      const existing = byDayFallback.get(day)
-      if (!existing || s.follower_count > existing.follower_count) {
-        byDayFallback.set(day, { captured_at: s.captured_at, follower_count: s.follower_count })
-      }
+    const existing = byDay.get(day)
+    if (!existing || s.captured_at > existing.captured_at) {
+      byDay.set(day, s)
     }
   }
-
-  // Merge: prefer real data per day
-  const byDay = new Map([...byDayFallback, ...byDayReal]) // real overwrites fallback
   const dailyEntries = [...byDay.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([day, v]) => [day, v.follower_count])
+    .map(([day, s]) => [day, s.follower_count])
 
-  // Build a set of days that have real 15-min poll data (not just reconstructed)
-  const realDays = new Set([...byDayReal.keys()])
-
-  // Compute day-over-day deltas from consecutive real-data days only.
-  // We only count a delta when BOTH the current and previous day have real data,
-  // ensuring we don't mix reconstructed (unreliable) counts into the rate calculation.
-  const dailyDeltas = []
+  // Compute day-over-day deltas from consecutive days
+  const snapshotDeltaValues = []
   for (let i = 1; i < dailyEntries.length; i++) {
     const prevDay = new Date(dailyEntries[i - 1][0])
     const currDay = new Date(dailyEntries[i][0])
     const dayGap = (currDay - prevDay) / (1000 * 60 * 60 * 24)
-    // Only use consecutive days (gap <= 2 to handle timezone edge cases)
     if (dayGap <= 2) {
       const delta = dailyEntries[i][1] - dailyEntries[i - 1][1]
-      if (delta >= 0) dailyDeltas.push(delta / dayGap) // normalize to per-day rate
+      if (delta >= 0) snapshotDeltaValues.push(delta / dayGap)
     }
   }
 
-  // For the moving average, prefer real-data deltas (consecutive real days).
-  // Fall back to all daily deltas if we don't have enough real-data deltas.
-  const realDayEntries = dailyEntries.filter(([day]) => realDays.has(day))
-  const realDayDeltas = []
-  for (let i = 1; i < realDayEntries.length; i++) {
-    const prevDay = new Date(realDayEntries[i - 1][0])
-    const currDay = new Date(realDayEntries[i][0])
-    const dayGap = (currDay - prevDay) / (1000 * 60 * 60 * 24)
-    if (dayGap <= 2) {
-      const delta = realDayEntries[i][1] - realDayEntries[i - 1][1]
-      if (delta >= 0) realDayDeltas.push(delta / dayGap)
+  // If we have fewer than 2 days of snapshots, compute rate from total span
+  // (e.g. first day: 3,396 at midnight, 3,820 at end = 424 followers in ~1 day)
+  if (snapshotDeltaValues.length === 0 && sorted.length >= 2) {
+    const first = sorted[0]
+    const last = sorted[sorted.length - 1]
+    const spanMs = new Date(last.captured_at) - new Date(first.captured_at)
+    const spanDays = spanMs / (1000 * 60 * 60 * 24)
+    if (spanDays > 0 && last.follower_count > first.follower_count) {
+      snapshotDeltaValues.push((last.follower_count - first.follower_count) / spanDays)
     }
   }
 
   // ─── 7-day moving average model ──────────────────────────────────────────
-  // Use real-data deltas if available (more reliable), otherwise fall back
-  // to all daily deltas. Capped at last 7 days.
-  const deltaSource = realDayDeltas.length >= 1 ? realDayDeltas : dailyDeltas
-  const recentDeltas = deltaSource.slice(-7)
+  const recentDeltas = snapshotDeltaValues.slice(-7)
 
   function mean(arr) {
     if (arr.length === 0) return 0
@@ -558,12 +492,6 @@ function computeForecast(snapshots, account) {
   if (recentDeltas.length >= 1) {
     movingAvg = mean(recentDeltas)
     sigma = stddev(recentDeltas, movingAvg)
-  } else if (dailyEntries.length >= 2) {
-    // Fallback: divide total growth by span days
-    const spanDays = (new Date(dailyEntries[dailyEntries.length - 1][0]) - new Date(dailyEntries[0][0])) / (1000 * 60 * 60 * 24)
-    if (spanDays > 0) {
-      movingAvg = (dailyEntries[dailyEntries.length - 1][1] - dailyEntries[0][1]) / spanDays
-    }
   }
   if (movingAvg <= 0) movingAvg = 1
 
@@ -630,10 +558,11 @@ function computeForecast(snapshots, account) {
     moderateRate: Math.round(moderateRate * 100) / 100,
     optimisticRate: Math.round(optimisticRate * 100) / 100,
     movingAvgDays: recentDeltas.length,
+    dataSource: 'snapshots',
     milestoneTable,
     projectionPoints,
-    disclaimer: recentDeltas.length < 3
-      ? `Forecast based on ${recentDeltas.length} day(s) of data — rates will improve as more snapshots are collected`
+    disclaimer: snapshotDeltaValues.length < 3
+      ? `Forecast based on ${snapshotDeltaValues.length} day(s) of growth data — rates will stabilize as more real data is collected`
       : null,
   }
 }
@@ -682,7 +611,7 @@ app.patch('/analytics/post/:id/category', (req, res) => {
     if (!category || typeof category !== 'string') {
       return res.status(400).json({ error: 'category is required' })
     }
-    const validCategories = ['Warning', 'Educational', 'Current Events', 'Opinion', 'Other', 'Uncategorized']
+    const validCategories = ['Warning', 'Educational', 'Current Events', 'Tech Drama', 'Opinion', 'Other', 'Uncategorized']
     if (!validCategories.includes(category)) {
       return res.status(400).json({ error: `Invalid category. Valid: ${validCategories.join(', ')}` })
     }
