@@ -101,8 +101,8 @@ export function FollowerForecast({ forecast, snapshots, currentFollowers }: Foll
       </div>
 
       {/* Chart */}
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-64 min-w-0">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={allData} margin={{ top: 8, right: 16, left: 8, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#2a2a4a" vertical={false} />
             <XAxis dataKey="displayDate" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />

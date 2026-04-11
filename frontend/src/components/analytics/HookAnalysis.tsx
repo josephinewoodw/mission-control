@@ -184,8 +184,8 @@ export function HookAnalysis({ posts, hookStats, dateFilter }: HookAnalysisProps
       {chartData.length > 0 && (
         <div>
           <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">Avg Reach by Hook Type</div>
-          <div className="h-40">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-40 min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a4a" vertical={false} />
                 <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} />

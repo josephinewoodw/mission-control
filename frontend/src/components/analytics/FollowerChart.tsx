@@ -131,7 +131,7 @@ export function FollowerChart({ snapshots, stats, posts, onJumpToPost }: Followe
         </div>
 
         {/* Chart mode toggle */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex gap-2 mb-3">
             {(['absolute', 'delta'] as const).map(mode => (
               <button
@@ -149,8 +149,8 @@ export function FollowerChart({ snapshots, stats, posts, onJumpToPost }: Followe
           </div>
 
           {chartMode === 'absolute' ? (
-            <div className="h-52">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-52 min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#2a2a4a" vertical={false} />
                   <XAxis dataKey="displayDate" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -168,8 +168,8 @@ export function FollowerChart({ snapshots, stats, posts, onJumpToPost }: Followe
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-52">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-52 min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <BarChart data={chartData.filter(d => d.delta !== null)} margin={{ top: 8, right: 8, left: 8, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#2a2a4a" vertical={false} />
                   <XAxis dataKey="displayDate" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />

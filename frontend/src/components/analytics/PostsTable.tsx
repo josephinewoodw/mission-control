@@ -1,7 +1,7 @@
 // components/analytics/PostsTable.tsx
 // Recent content performance table — sortable, expandable rows, inline category editing.
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import type { Post } from '../../hooks/useAnalyticsData'
 
 const CATEGORIES = ['Warning', 'Educational', 'Current Events', 'Opinion', 'Other', 'Uncategorized']
@@ -177,9 +177,8 @@ export function PostsTable({
             const mediaColor = MEDIA_TYPE_COLORS[post.media_type || ''] || 'bg-gray-500/20 text-gray-400 border-gray-500/30'
 
             return (
-              <>
+              <React.Fragment key={post.id}>
                 <tr
-                  key={post.id}
                   className="hover:bg-bg-dark/50 cursor-pointer transition-colors"
                   onClick={() => toggleExpand(post.id)}
                 >
@@ -257,7 +256,7 @@ export function PostsTable({
 
                 {/* Expanded row */}
                 {isExpanded && (
-                  <tr key={`${post.id}-expanded`} className="bg-bg-dark/80">
+                  <tr className="bg-bg-dark/80">
                     <td colSpan={12} className="px-6 py-4">
                       <div className="grid grid-cols-[1fr_auto] gap-6">
                         <div className="space-y-3">
@@ -330,7 +329,7 @@ export function PostsTable({
                     </td>
                   </tr>
                 )}
-              </>
+              </React.Fragment>
             )
           })}
           {filtered.length === 0 && (
