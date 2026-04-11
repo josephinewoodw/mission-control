@@ -96,7 +96,7 @@ export interface Forecast {
   optimisticRate: number
   milestoneTable: ForecastMilestone[]
   projectionPoints: ForecastPoint[]
-  disclaimer: string
+  disclaimer: string | null
 }
 
 export interface AccountSnapshot {

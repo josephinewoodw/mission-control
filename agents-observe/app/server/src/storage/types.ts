@@ -101,8 +101,8 @@ export interface EventStore {
   }): Promise<number>
   getTasksForAgent(agentName: string, limit?: number): Promise<any[]>
   getAllTasks(limit?: number): Promise<any[]>
-  updateTaskStatus(id: number, status: 'queued' | 'active' | 'completed' | 'failed' | 'stale'): Promise<void>
-  updateTaskByToolUseId(toolUseId: string, status: 'active' | 'completed' | 'failed'): Promise<void>
+  updateTaskStatus(id: number, status: 'queued' | 'in_progress' | 'active' | 'completed' | 'failed' | 'stale'): Promise<void>
+  updateTaskByToolUseId(toolUseId: string, status: 'in_progress' | 'completed' | 'failed'): Promise<void>
   getTaskById(id: number): Promise<any | null>
   /** Mark all active/queued tasks as stale — called on server cold startup to clear leftover tasks from crashed sessions */
   markStaleTasksOnStartup(): Promise<number>

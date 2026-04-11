@@ -235,7 +235,7 @@ router.post('/events', async (c) => {
           // rather than stuck in "queued". It will stay active until manually cleared
           // or until a future mechanism notifies agents-observe of completion.
           try {
-            await store.updateTaskByToolUseId(parsed.toolUseId, 'active')
+            await store.updateTaskByToolUseId(parsed.toolUseId, 'in_progress')
           } catch {
             // Non-fatal
           }

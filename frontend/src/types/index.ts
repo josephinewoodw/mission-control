@@ -156,7 +156,7 @@ export interface AgentTask {
   agent_name: AgentName
   title: string
   description: string | null
-  status: 'queued' | 'active' | 'completed' | 'failed' | 'stale'
+  status: 'queued' | 'in_progress' | 'active' | 'completed' | 'failed' | 'stale'
   priority: number
   created_at: number
   started_at: number | null

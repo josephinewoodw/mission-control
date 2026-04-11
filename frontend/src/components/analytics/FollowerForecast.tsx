@@ -4,7 +4,7 @@
 import { useState } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Legend,
+  ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 import type { Forecast, FollowerSnapshot } from '../../hooks/useAnalyticsData'
 
@@ -23,8 +23,6 @@ export function FollowerForecast({ forecast, snapshots, currentFollowers }: Foll
   const [showConservative, setShowConservative] = useState(true)
   const [showModerate, setShowModerate] = useState(true)
   const [showOptimistic, setShowOptimistic] = useState(true)
-  const [milestoneRef, setMilestoneRef] = useState<'moderate' | 'conservative' | 'optimistic'>('moderate')
-
   // Build combined chart data: historical + forecast
   // Historical: use deduplicated monthly snapshots
   const snapshotMap = new Map<string, number>()
@@ -56,9 +54,6 @@ export function FollowerForecast({ forecast, snapshots, currentFollowers }: Foll
   // Merge: last historical point connects to first forecast point
   const allData = [...historical, ...projectionData]
 
-  // Next milestone based on selected reference line
-  const nextMilestone = forecast.milestoneTable[0]
-
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null
     return (
@@ -73,8 +68,20 @@ export function FollowerForecast({ forecast, snapshots, currentFollowers }: Foll
     )
   }
 
-  // Milestone reference lines (for upcoming milestones)
-  const upcomingMilestones = forecast.milestoneTable.filter(m => m.milestone <= 10000)
+  // Determine chart Y max to filter milestones that are in range
+  const chartYMax = Math.max(
+    currentFollowers,
+    ...allData.map(d => Math.max(
+      d.historical ?? 0,
+      d.conservative ?? 0,
+      d.moderate ?? 0,
+      d.optimistic ?? 0,
+    ))
+  )
+
+  // Show milestones that are below the chart ceiling (with 10% buffer below top)
+  const ALL_MILESTONES = [5000, 10000, 25000, 50000, 100000]
+  const visibleMilestones = ALL_MILESTONES.filter(m => m > currentFollowers && m <= chartYMax * 1.05)
 
   return (
     <div className="space-y-5">
@@ -115,17 +122,19 @@ export function FollowerForecast({ forecast, snapshots, currentFollowers }: Foll
             <Tooltip content={<CustomTooltip />} />
 
             {/* Milestone reference lines */}
-            {upcomingMilestones.map(m => (
+            {visibleMilestones.map(m => (
               <ReferenceLine
-                key={m.milestone}
-                y={m.milestone}
-                stroke="#2a2a4a"
-                strokeDasharray="4 4"
+                key={m}
+                y={m}
+                stroke="#3d6b3d"
+                strokeDasharray="6 4"
+                strokeWidth={1.5}
                 label={{
-                  value: m.milestone >= 1000 ? `${m.milestone/1000}k` : m.milestone.toString(),
-                  position: 'right',
-                  fill: '#4b5563',
+                  value: m >= 1000 ? `${m/1000}K` : m.toString(),
+                  position: 'insideTopRight',
+                  fill: '#5a9e5a',
                   fontSize: 10,
+                  fontWeight: 700,
                 }}
               />
             ))}
@@ -181,64 +190,10 @@ export function FollowerForecast({ forecast, snapshots, currentFollowers }: Foll
         </ResponsiveContainer>
       </div>
 
-      {/* Confidence disclaimer */}
-      <div className="text-xs text-gray-600 italic">{forecast.disclaimer}</div>
-
-      {/* Milestone table */}
-      <div>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="text-xs text-gray-500 uppercase tracking-wider">Milestone Projections</div>
-          <div className="flex gap-2">
-            {(['moderate', 'conservative', 'optimistic'] as const).map(ref => (
-              <button
-                key={ref}
-                onClick={() => setMilestoneRef(ref)}
-                className={`px-2 py-0.5 text-[0.6rem] rounded border transition-colors capitalize ${
-                  milestoneRef === ref
-                    ? 'bg-fern/15 text-fern border-fern/30'
-                    : 'bg-bg-dark text-gray-500 border-border hover:text-gray-400'
-                }`}
-              >
-                {ref}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="px-3 py-2 text-left text-gray-500 uppercase tracking-wider">Milestone</th>
-                <th className="px-3 py-2 text-left text-gray-500 uppercase tracking-wider">Conservative</th>
-                <th className="px-3 py-2 text-left text-gray-500 uppercase tracking-wider">Moderate</th>
-                <th className="px-3 py-2 text-left text-gray-500 uppercase tracking-wider">Optimistic</th>
-                <th className="px-3 py-2 text-left text-gray-500 uppercase tracking-wider">Days Away ({milestoneRef})</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/50">
-              {forecast.milestoneTable.map(m => {
-                const daysKey = `${milestoneRef}_days` as 'conservative_days' | 'moderate_days' | 'optimistic_days'
-                const daysAway = m[daysKey]
-                const isPrimary = m.milestone === 5000 || m.milestone === 10000
-                return (
-                  <tr key={m.milestone} className={`hover:bg-bg-dark/50 ${isPrimary ? 'bg-fern/5' : ''}`}>
-                    <td className={`px-3 py-2 font-medium ${isPrimary ? 'text-fern' : 'text-gray-300'}`}>
-                      {m.milestone >= 1000 ? `${m.milestone/1000}k` : m.milestone}
-                      {isPrimary && <span className="ml-1 text-[0.6rem] text-fern/60">★</span>}
-                    </td>
-                    <td className="px-3 py-2 text-gray-400">{m.conservative_date || '—'}</td>
-                    <td className="px-3 py-2 text-gray-300">{m.moderate_date || '—'}</td>
-                    <td className="px-3 py-2 text-gray-400">{m.optimistic_date || '—'}</td>
-                    <td className={`px-3 py-2 font-mono ${daysAway && daysAway < 180 ? 'text-fern' : 'text-gray-500'}`}>
-                      {daysAway !== null ? `${daysAway}d` : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Disclaimer — only shown if backend provides one */}
+      {forecast.disclaimer && (
+        <div className="text-xs text-gray-600 italic">{forecast.disclaimer}</div>
+      )}
     </div>
   )
 }

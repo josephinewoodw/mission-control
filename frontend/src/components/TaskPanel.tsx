@@ -28,8 +28,10 @@ function isJustCompleted(task: AgentTask): boolean {
 function statusBadge(task: AgentTask): { label: string; className: string } {
   const justDone = isJustCompleted(task)
   switch (task.status) {
+    case 'in_progress':
+      return { label: 'In Progress', className: 'bg-working/20 text-working border border-working/30' }
     case 'active':
-      return { label: 'Active', className: 'bg-working/20 text-working border border-working/30' }
+      return { label: 'Pending', className: 'bg-reed/20 text-reed border border-reed/30' }
     case 'queued':
       return { label: 'Queued', className: 'bg-fern/10 text-fern border border-fern/20' }
     case 'completed':
@@ -51,21 +53,24 @@ function TaskItem({ task }: { task: AgentTask }) {
   return (
     <div
       className={`p-3 rounded-lg border transition-all ${
-        task.status === 'active'
+        task.status === 'in_progress'
           ? 'border-working/30 bg-working/5'
-          : task.status === 'queued'
-            ? 'border-border bg-bg-primary/50'
-            : task.status === 'stale'
-              ? 'border-gray-700/30 bg-transparent opacity-40'
-              : justDone
-                ? 'border-fern/30 bg-fern/5 shadow-[0_0_8px_rgba(74,222,128,0.08)]'
-                : 'border-border/40 bg-transparent opacity-60'
+          : task.status === 'active'
+            ? 'border-reed/30 bg-reed/5'
+            : task.status === 'queued'
+              ? 'border-border bg-bg-primary/50'
+              : task.status === 'stale'
+                ? 'border-gray-700/30 bg-transparent opacity-40'
+                : justDone
+                  ? 'border-fern/30 bg-fern/5 shadow-[0_0_8px_rgba(74,222,128,0.08)]'
+                  : 'border-border/40 bg-transparent opacity-60'
       }`}
     >
       <div className="flex items-start gap-2">
         {/* Status dot */}
         <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
-          task.status === 'active' ? 'bg-working animate-pulse-dot' :
+          task.status === 'in_progress' ? 'bg-working animate-pulse-dot' :
+          task.status === 'active' ? 'bg-reed' :
           task.status === 'queued' ? 'bg-fern' :
           task.status === 'stale' ? 'bg-gray-600' :
           task.status === 'completed' ? (justDone ? 'bg-fern' : 'bg-gray-600') :
@@ -98,7 +103,8 @@ function TaskItem({ task }: { task: AgentTask }) {
 }
 
 export function TaskPanel({ agentName, tasks, onClose }: TaskPanelProps) {
-  const activeTasks = tasks.filter(t => t.status === 'active')
+  const activeTasks = tasks.filter(t => t.status === 'in_progress')
+  const pendingTasks = tasks.filter(t => t.status === 'active')
   const queuedTasks = tasks.filter(t => t.status === 'queued')
   const staleTasks = tasks.filter(t => t.status === 'stale').slice(0, 5)
   const recentDone = tasks
@@ -109,7 +115,7 @@ export function TaskPanel({ agentName, tasks, onClose }: TaskPanelProps) {
     ? agentName.charAt(0).toUpperCase() + agentName.slice(1)
     : 'All Agents'
 
-  const totalActive = activeTasks.length + queuedTasks.length
+  const totalActive = activeTasks.length + pendingTasks.length + queuedTasks.length
 
   return (
     <div className="bg-bg-card border border-border rounded-2xl overflow-hidden flex flex-col max-h-[500px]">
@@ -144,11 +150,19 @@ export function TaskPanel({ agentName, tasks, onClose }: TaskPanelProps) {
           </div>
         )}
 
-        {/* Active */}
+        {/* In Progress */}
         {activeTasks.length > 0 && (
           <div className="space-y-1.5">
-            <div className="text-[0.6rem] text-gray-600 uppercase tracking-widest px-1">Active</div>
+            <div className="text-[0.6rem] text-gray-600 uppercase tracking-widest px-1">In Progress</div>
             {activeTasks.map(t => <TaskItem key={t.id} task={t} />)}
+          </div>
+        )}
+
+        {/* Pending (needs help) */}
+        {pendingTasks.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="text-[0.6rem] text-gray-600 uppercase tracking-widest px-1 mt-2">Pending</div>
+            {pendingTasks.map(t => <TaskItem key={t.id} task={t} />)}
           </div>
         )}
 

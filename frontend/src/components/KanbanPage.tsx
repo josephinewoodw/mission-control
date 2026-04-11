@@ -16,7 +16,7 @@ const COLUMN_ORDER: KanbanStatus[] = ['backlog', 'active', 'in_progress', 'done'
 
 const COLUMN_LABELS: Record<KanbanStatus, string> = {
   backlog: 'Backlog',
-  active: 'Active',
+  active: 'Pending',
   in_progress: 'In Progress',
   done: 'Done',
 }

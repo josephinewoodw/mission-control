@@ -47,7 +47,7 @@ function App() {
       if (agent.status === 'blocked') continue
       const agentTasks = tasksByAgent[name] || []
       // Stale tasks must not influence agent status — they're ghosts from a previous session
-      const activeTask = agentTasks.find(t => t.status === 'active')
+      const activeTask = agentTasks.find(t => t.status === 'in_progress')
       if (activeTask) {
         // Always update highLevelTask from active task to ensure it reflects current work.
         // Also promote to 'working' if not already in that state.
@@ -225,7 +225,7 @@ function App() {
                   {(['fern', 'scout', 'reed', 'sentinel', 'timber'] as AgentName[]).map(name => {
                     const agent = agents[name]
                     const agentTasks = tasksByAgent[name] || []
-                    const activeTasks = agentTasks.filter(t => t.status === 'active' || t.status === 'queued').length
+                    const activeTasks = agentTasks.filter(t => t.status === 'in_progress' || t.status === 'queued').length
                     const isSelected = selectedAgent === name
                     const statusColor =
                       agent?.status === 'working' ? 'bg-working' :

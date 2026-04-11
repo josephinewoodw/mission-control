@@ -30,6 +30,93 @@ function getDateRange(preset: DatePreset): { start: Date | null; end: Date | nul
   return { start, end }
 }
 
+// ─── Summary KPI tiles ────────────────────────────────────────────────────────
+
+function KpiTile({ label, value, sub, highlight = false }: {
+  label: string
+  value: string | number
+  sub?: string
+  highlight?: boolean
+}) {
+  return (
+    <div className={`bg-bg-dark rounded-xl border px-4 py-3 flex flex-col gap-1 min-w-0 ${highlight ? 'border-fern/30' : 'border-border'}`}>
+      <div className="text-[0.65rem] text-gray-500 uppercase tracking-widest font-medium">{label}</div>
+      <div className={`text-xl font-semibold leading-tight truncate ${highlight ? 'text-fern' : 'text-gray-100'}`}>{value}</div>
+      {sub && <div className="text-[0.65rem] text-gray-500 leading-tight">{sub}</div>}
+    </div>
+  )
+}
+
+function SummaryTiles({ data }: { data: any }) {
+  const followers = data?.followerStats?.current ?? 0
+  const change7d = data?.followerStats?.change_7d
+  const change30d = data?.followerStats?.change_30d
+  const totalPosts = data?.account?.media_count ?? data?.posts?.length ?? 0
+
+  // Avg reach and engagement rate from all posts with real metrics
+  const postsWithMetrics = (data?.posts ?? []).filter((p: any) => p.metrics?.reach > 0)
+  const avgReach = postsWithMetrics.length > 0
+    ? Math.round(postsWithMetrics.reduce((sum: number, p: any) => sum + p.metrics.reach, 0) / postsWithMetrics.length)
+    : 0
+  const avgEngRate = postsWithMetrics.length > 0
+    ? (postsWithMetrics.reduce((sum: number, p: any) => sum + p.metrics.engagement_rate, 0) / postsWithMetrics.length).toFixed(1)
+    : '—'
+
+  // Best post this week (last 7 days by reach)
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const recentPosts = (data?.posts ?? []).filter((p: any) =>
+    p.published_at && new Date(p.published_at) >= weekAgo && p.metrics?.reach > 0
+  )
+  const bestPost = recentPosts.length > 0
+    ? recentPosts.reduce((best: any, p: any) => p.metrics.reach > best.metrics.reach ? p : best, recentPosts[0])
+    : null
+  const bestPostTitle = bestPost
+    ? (bestPost.hook_text || bestPost.caption || '').substring(0, 40) + ((bestPost.hook_text || bestPost.caption || '').length > 40 ? '…' : '')
+    : '—'
+  const bestPostReach = bestPost ? bestPost.metrics.reach.toLocaleString() : null
+
+  const fmt = (n: number | null | undefined) => {
+    if (n == null) return '—'
+    return n >= 0 ? `+${n.toLocaleString()}` : n.toLocaleString()
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <KpiTile
+        label="Followers"
+        value={followers.toLocaleString()}
+        sub={change7d != null ? `${fmt(change7d)} this week` : undefined}
+        highlight
+      />
+      <KpiTile
+        label="30d Change"
+        value={fmt(change30d)}
+        sub="follower growth"
+      />
+      <KpiTile
+        label="Total Posts"
+        value={totalPosts}
+        sub="published"
+      />
+      <KpiTile
+        label="Avg Reach"
+        value={avgReach > 0 ? avgReach.toLocaleString() : '—'}
+        sub="per post"
+      />
+      <KpiTile
+        label="Avg Engagement"
+        value={`${avgEngRate}%`}
+        sub="engagement rate"
+      />
+      <KpiTile
+        label="Best This Week"
+        value={bestPost ? `${Number(bestPostReach?.replace(/,/g, '')).toLocaleString()} reach` : '—'}
+        sub={bestPost ? bestPostTitle : 'no posts this week'}
+      />
+    </div>
+  )
+}
+
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
 function Section({ title, children, className = '' }: {
@@ -216,6 +303,9 @@ export function AnalyticsPage({ onBack }: AnalyticsPageProps) {
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto feed-scroll">
         <div className="p-5 space-y-5 max-w-[1400px]">
+
+          {/* Section 0: Summary KPI tiles */}
+          {data && <SummaryTiles data={data} />}
 
           {/* Section 1: Account header */}
           <AccountHeader

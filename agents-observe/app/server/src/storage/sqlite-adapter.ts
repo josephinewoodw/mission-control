@@ -582,7 +582,7 @@ export class SqliteAdapter implements EventStore {
          WHERE agent_name = ?
          ORDER BY
            CASE status
-             WHEN 'active' THEN 0
+             WHEN 'in_progress' THEN 0
              WHEN 'queued' THEN 1
              WHEN 'completed' THEN 2
              WHEN 'failed' THEN 3
@@ -602,7 +602,7 @@ export class SqliteAdapter implements EventStore {
         `SELECT * FROM agent_tasks
          ORDER BY
            CASE status
-             WHEN 'active' THEN 0
+             WHEN 'in_progress' THEN 0
              WHEN 'queued' THEN 1
              WHEN 'completed' THEN 2
              WHEN 'failed' THEN 3
@@ -618,13 +618,13 @@ export class SqliteAdapter implements EventStore {
 
   async updateTaskStatus(
     id: number,
-    status: 'queued' | 'active' | 'completed' | 'failed' | 'stale',
+    status: 'queued' | 'in_progress' | 'active' | 'completed' | 'failed' | 'stale',
   ): Promise<void> {
     const now = Date.now()
-    const startedAt = status === 'active' ? now : null
+    const startedAt = status === 'in_progress' ? now : null
     const completedAt = status === 'completed' || status === 'failed' ? now : null
 
-    if (status === 'active') {
+    if (status === 'in_progress') {
       this.db
         .prepare(`UPDATE agent_tasks SET status = ?, started_at = ? WHERE id = ?`)
         .run(status, startedAt, id)
@@ -639,10 +639,10 @@ export class SqliteAdapter implements EventStore {
 
   async updateTaskByToolUseId(
     toolUseId: string,
-    status: 'active' | 'completed' | 'failed',
+    status: 'in_progress' | 'completed' | 'failed',
   ): Promise<void> {
     const now = Date.now()
-    if (status === 'active') {
+    if (status === 'in_progress') {
       this.db
         .prepare(`UPDATE agent_tasks SET status = ?, started_at = ? WHERE tool_use_id = ? AND status = 'queued'`)
         .run(status, now, toolUseId)
@@ -658,15 +658,18 @@ export class SqliteAdapter implements EventStore {
   }
 
   /**
-   * Mark ALL active/queued tasks as stale. Called on server cold startup (no session yet)
+   * Mark active/queued tasks as stale. Called on server cold startup (no session yet)
    * to clean up tasks left open when the previous session crashed or was killed.
+   * Tasks with no session_id are API-created (not tied to a Claude session) and are
+   * preserved — they should not be staled on startup.
    * Returns the number of tasks marked stale.
    */
   async markStaleTasksOnStartup(): Promise<number> {
     const result = this.db
       .prepare(
         `UPDATE agent_tasks SET status = 'stale', completed_at = ?
-         WHERE status IN ('active', 'queued')`,
+         WHERE status IN ('in_progress', 'queued')
+           AND session_id IS NOT NULL`,
       )
       .run(Date.now())
     const count = result.changes
@@ -680,14 +683,17 @@ export class SqliteAdapter implements EventStore {
    * Mark active/queued tasks from PREVIOUS sessions as stale. Called when a new
    * Claude session starts (SessionStart event) while the server is already running.
    * Tasks belonging to the current session are preserved.
+   * Tasks with no session_id are API-created (not tied to any session) and are
+   * preserved — they represent manually managed tasks and should not auto-stale.
    * Returns the number of tasks marked stale.
    */
   async markStaleTasksForNewSession(currentSessionId: string): Promise<number> {
     const result = this.db
       .prepare(
         `UPDATE agent_tasks SET status = 'stale', completed_at = ?
-         WHERE status IN ('active', 'queued')
-           AND (session_id IS NULL OR session_id != ?)`,
+         WHERE status IN ('in_progress', 'queued')
+           AND session_id IS NOT NULL
+           AND session_id != ?`,
       )
       .run(Date.now(), currentSessionId)
     const count = result.changes

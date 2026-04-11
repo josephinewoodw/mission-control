@@ -472,30 +472,59 @@ function computeForecast(snapshots, account) {
   const current = account?.followers_count || 100
   const sorted = [...snapshots].sort((a, b) => new Date(a.captured_at) - new Date(b.captured_at))
 
-  // Conservative: linear regression on last 30 days
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-  const recent = sorted.filter(s => new Date(s.captured_at) >= thirtyDaysAgo)
-
-  let conservativeRate = 0
-  if (recent.length >= 2) {
-    const first = recent[0]
-    const last = recent[recent.length - 1]
-    const daysDiff = (new Date(last.captured_at) - new Date(first.captured_at)) / (1000 * 60 * 60 * 24)
-    if (daysDiff > 0) {
-      conservativeRate = (last.follower_count - first.follower_count) / daysDiff
+  // ─── Compute day-over-day deltas from snapshot data ───────────────────────
+  // Group snapshots by day, take the max follower count per day (end-of-day)
+  const byDay = new Map()
+  for (const s of sorted) {
+    const day = s.captured_at.substring(0, 10)
+    if (!byDay.has(day) || s.follower_count > byDay.get(day)) {
+      byDay.set(day, s.follower_count)
     }
   }
+  const dailyEntries = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))
 
-  // Fallback: assume 1 follower/day if no history
-  if (conservativeRate <= 0) conservativeRate = 1
+  // Compute day-over-day deltas
+  const dailyDeltas = []
+  for (let i = 1; i < dailyEntries.length; i++) {
+    const delta = dailyEntries[i][1] - dailyEntries[i - 1][1]
+    if (delta >= 0) dailyDeltas.push(delta) // ignore negative (data correction artifacts)
+  }
 
-  // Moderate: conservative * 1.5 + occasional viral boost
-  const moderateRate = conservativeRate * 1.5
+  // ─── Average daily growth rate scenarios ─────────────────────────────────
+  // Moderate: overall average daily growth across all available data
+  let moderateRate = 1
+  if (dailyDeltas.length >= 1) {
+    moderateRate = dailyDeltas.reduce((a, b) => a + b, 0) / dailyDeltas.length
+  } else if (dailyEntries.length >= 2) {
+    // Fallback: divide total growth by span days
+    const spanDays = (new Date(dailyEntries[dailyEntries.length - 1][0]) - new Date(dailyEntries[0][0])) / (1000 * 60 * 60 * 24)
+    if (spanDays > 0) {
+      moderateRate = (dailyEntries[dailyEntries.length - 1][1] - dailyEntries[0][1]) / spanDays
+    }
+  }
+  if (moderateRate <= 0) moderateRate = 1
 
-  // Optimistic: based on March 13-18 run avg (used as proxy for high-performing period)
-  const optimisticRate = Math.max(conservativeRate * 3, 5)
+  // Conservative: average of the slower days (bottom half, or minimum of 1)
+  let conservativeRate = moderateRate * 0.5
+  if (dailyDeltas.length >= 4) {
+    const sorted30 = [...dailyDeltas].sort((a, b) => a - b)
+    const worstN = Math.max(1, Math.floor(dailyDeltas.length * 0.4))
+    const worst = sorted30.slice(0, worstN)
+    conservativeRate = worst.reduce((a, b) => a + b, 0) / worst.length
+  }
+  if (conservativeRate <= 0) conservativeRate = Math.max(1, moderateRate * 0.3)
 
-  const milestones = [500, 1000, 2500, 5000, 10000, 25000, 50000, 100000]
+  // Optimistic: average of the best days (top 25%, or top viral days)
+  let optimisticRate = moderateRate * 2
+  if (dailyDeltas.length >= 4) {
+    const sorted30 = [...dailyDeltas].sort((a, b) => b - a)
+    const bestN = Math.max(1, Math.floor(dailyDeltas.length * 0.25))
+    const best = sorted30.slice(0, bestN)
+    optimisticRate = best.reduce((a, b) => a + b, 0) / best.length
+  }
+  if (optimisticRate <= moderateRate) optimisticRate = moderateRate * 2
+
+  const milestones = [5000, 10000, 25000, 50000, 100000]
 
   function daysToMilestone(milestone, rate) {
     if (current >= milestone) return null
@@ -548,7 +577,7 @@ function computeForecast(snapshots, account) {
     optimisticRate: Math.round(optimisticRate * 100) / 100,
     milestoneTable,
     projectionPoints,
-    disclaimer: 'Linear regression on ~100 followers. Low confidence — use as directional guide only.',
+    disclaimer: null,
   }
 }
 
