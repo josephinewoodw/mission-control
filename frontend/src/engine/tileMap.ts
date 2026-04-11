@@ -2,188 +2,183 @@ import { TILE, GRID_COLS, GRID_ROWS } from './constants'
 
 /**
  * Tile types:
- * 0 = wall (not walkable)
- * 1 = floor (walkable) — Pixel Agents floor_1 drawn at 2x
- * 4 = furniture (not walkable, set by collision builder)
+ * 0   = wall (not walkable)
+ * 1   = wood floor (walkable) — Eliza Wood Floor A
+ * 2   = tile floor (walkable) — Eliza Tile B (break room / kitchen)
  * 255 = void (empty/transparent)
- */
-export type TileType = 'floor_wood' | 'wall' | 'wall_base' | 'floor_break' | 'floor_kitchen' | 'empty'
-
-/**
- * New 20x15 office layout designed for 32px LPC tiles.
  *
- * Legend:
- *   0 = wall
- *   1 = warm wood floor (floor_1.png at 2x scale)
- *   2 = break room floor (cooler tone — slightly blue-gray wood)
- *   3 = kitchenette tile floor (checkerboard pattern)
- *   255 = void
- *
- * Layout:
- *   Rows 0-2: walls (top, 3 rows thick)
- *   Row 3: wall base row (floor behind wall decorations — walkable)
- *   Rows 4-13: open office floor (work area left of col 12, break room right)
- *   Row 14: bottom wall
- *   Col 12: divider wall between work area and break room (gap at rows 7-8 for doorway)
+ * Layout derived from LDtk file (mc-office.ldtk):
+ *   40x30 grid at 16px tiles = 640x480 canvas
+ *   Rows 0-5:  top wall zone
+ *   Row 4:     partial tile floor in break room right side (cols 30-37)
+ *   Rows 6-15: upper office floor (left=wood cols 0-25, right=tile cols 28-39)
+ *   Rows 16-19: corridor — full-width wood floor, no divider
+ *   Rows 20-29: lower office floor (left=wood cols 0-25, right=wood cols 28-39)
+ *   Cols 26-27: vertical room divider wall (rows 0-15 and 20-29, gap at 16-19)
  */
+export type TileType = 'floor_wood' | 'floor_tile' | 'wall' | 'empty'
 
 // prettier-ignore
 const LAYOUT: number[][] = [
-  // Row 0: top wall
-  [0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-  // Row 1: wall
-  [0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-  // Row 2: wall base (visible wall strip with decorations)
-  [0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-  // Row 3: floor behind wall decorations — divider wall starts here
-  [0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  3,  3,  3,  3,  3,  3,  0],
-  // Row 4: desk row upper — kitchenette tile floor in break room
-  [0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  3,  3,  3,  3,  3,  3,  0],
-  // Row 5: desk row lower — kitchenette tile floor continues
-  [0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  3,  3,  3,  3,  3,  3,  0],
-  // Row 6: chair row — transition to lounge floor
-  [0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  2,  2,  2,  2,  2,  2,  0],
-  // Row 7: open floor / walkway — DOORWAY (col 12 is floor for passage)
-  [0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  2,  2,  2,  2,  2,  2,  2,  0],
-  // Row 8: corridor — DOORWAY (col 12 is floor for passage)
-  [0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  2,  2,  2,  2,  2,  2,  2,  0],
-  // Row 9: desk row lower pair
-  [0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  2,  2,  2,  2,  2,  2,  0],
-  // Row 10: desk row lower
-  [0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  2,  2,  2,  2,  2,  2,  0],
-  // Row 11: chair row
-  [0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  2,  2,  2,  2,  2,  2,  0],
-  // Row 12: open floor
-  [0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  2,  2,  2,  2,  2,  2,  0],
-  // Row 13: bottom floor
-  [0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  2,  2,  2,  2,  2,  2,  0],
-  // Row 14: bottom wall
-  [0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+  //  0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19  20  21  22  23  24  25  26  27  28  29  30  31  32  33  34  35  36  37  38  39
+  [  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],  // Row 0
+  [  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],  // Row 1
+  [  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],  // Row 2
+  [  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],  // Row 3
+  [  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  2,  2,  2,  2,  2,  2,  2,  2,  0,  0],  // Row 4
+  [  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],  // Row 5
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2],  // Row 6
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2],  // Row 7
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2],  // Row 8
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2],  // Row 9
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2],  // Row 10
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2],  // Row 11
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2],  // Row 12
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2],  // Row 13
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2],  // Row 14
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2],  // Row 15
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 16 (corridor)
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 17 (corridor)
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 18 (corridor)
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 19 (corridor)
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 20
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 21
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 22
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 23
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 24
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 25
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 26
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 27
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 28
+  [  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],  // Row 29
 ]
 
-/** Furniture placement definitions for the new layout */
+/** Furniture placement definitions for the LDtk-derived layout */
 export interface FurniturePlacement {
   type: string     // Asset ID from spriteCache
-  col: number      // Tile column
+  col: number      // Tile column (in 16px grid)
   row: number      // Tile row (footprint bottom-anchor row)
   mirrored?: boolean
 }
 
 /**
- * Hardcoded furniture layout for the 20x15 office.
+ * Furniture layout derived from mc-office.ldtk entity positions.
  *
- * Upper work area (cols 2-10, rows 4-6):
- *   - Fern's desk at cols 2-4, row 4-5; chair at col 3, row 6
- *   - Timber's desk at cols 5-7, row 4-5; chair at col 6, row 6
- *   - Scout's desk at cols 8-10, row 4-5; chair at col 9, row 6
+ * LDtk grid is 16px tiles, matching our new TILE=16 grid.
+ * Entity positions are in 16px tile grid coordinates.
  *
- * Lower work area (cols 2-10, rows 9-11):
- *   - Reed's desk at cols 2-4, row 9-10; chair at col 3, row 11
- *   - Sentinel's desk at cols 5-7, row 9-10; chair at col 6, row 11
- *   - Tide's desk at cols 8-10, row 9-10; chair at col 9, row 11
+ * Upper section (rows 6-15):
+ *   - Fern's desk:    Desk_2 at col 4,  row 8  | Chair at col 4,  row 7
+ *   - Timber's desk:  Desk_2 at col 12, row 8  | Chair at col 12, row 7
+ *   - Scout's desk:   Desk_2 at col 20, row 8  | Chair at col 20, row 7
+ *   - Bookshelves at col 2 and col 6, row 5
+ *   - TV at col 12, row 2
+ *   - Mailboxes at col 18, row 3
  *
- * Break room (separate enclosed room, cols 13-18, rows 3-13):
- *   - Divider wall at col 12 with doorway at rows 7-8
- *   - Counter along back wall (cols 14-16, row 4) with coffee maker (col 15) + water cooler (col 16) side by side
- *   - Dining table at col 15, row 6 with chairs (kitchen area for coffee breaks)
- *   - Lounge area: sofa + coffee table (rows 9-11)
- *   - Plants for coziness (large plant near doorway, not blocking counter)
+ * Break room / right side (cols 28-39):
+ *   - Countertops + coffee maker + water cooler at rows 3-4
+ *   - Fridge at col 37
+ *   - Tables + stools at rows 9-12
+ *   - Copy machine at col 36, row 15
  *
- * Wall decorations (row 2-3):
- *   - Bookshelves, paintings, clock, TV, hanging plants
+ * Lower section (rows 20-29):
+ *   - Reed's desk:     Desk_2 at col 4,  row 27 | Chair at col 3,  row 26
+ *   - Sentinel's desk: Desk_2 at col 12, row 27 | Chair at col 12, row 25
+ *   - Tide's desk:     Desk_2 at col 20, row 27 | Chair at col 21, row 25
  */
 export const FURNITURE_LAYOUT: FurniturePlacement[] = [
-  // ── Fern's workstation (upper left) ──
-  { type: 'DESK_FRONT', col: 2, row: 5 },         // Desk
-  { type: 'PC_FRONT_ON', col: 3, row: 5 },         // Laptop ON desk (same row)
-  { type: 'CUSHIONED_BENCH', col: 3, row: 6 },     // Chair
+  // ── Upper section: Fern's workstation ──
+  { type: 'ELIZA_DESK',   col: 4,  row: 8  },   // 3-tile wide desk
+  { type: 'ELIZA_CHAIR',  col: 4,  row: 7  },
+  { type: 'ELIZA_LAPTOP', col: 5,  row: 8  },   // Laptop on desk
+  { type: 'ELIZA_PAPER',  col: 4,  row: 8  },   // Papers
+  { type: 'ELIZA_MUG',    col: 3,  row: 8  },   // Coffee mug
 
-  // ── Timber's workstation (upper center) ──
-  { type: 'DESK_FRONT', col: 5, row: 5 },
-  { type: 'PC_FRONT_ON', col: 6, row: 5 },         // Laptop ON desk (same row)
-  { type: 'CUSHIONED_BENCH', col: 6, row: 6 },
+  // ── Upper section: Timber's workstation ──
+  { type: 'ELIZA_DESK',      col: 12, row: 8  },
+  { type: 'ELIZA_CHAIR',     col: 12, row: 7  },
+  { type: 'ELIZA_MONITOR',   col: 12, row: 8  },  // Monitor on desk
+  { type: 'ELIZA_PAPER',     col: 14, row: 8  },
+  { type: 'ELIZA_MUG',       col: 11, row: 8  },
 
-  // ── Scout's workstation (upper right) ──
-  { type: 'DESK_FRONT', col: 8, row: 5 },
-  { type: 'PC_FRONT_ON', col: 9, row: 5 },         // Laptop ON desk (same row)
-  { type: 'CUSHIONED_CHAIR', col: 9, row: 6 },
+  // ── Upper section: Scout's workstation ──
+  { type: 'ELIZA_DESK',    col: 20, row: 8  },
+  { type: 'ELIZA_CHAIR',   col: 20, row: 7  },
+  { type: 'ELIZA_MONITOR3', col: 20, row: 8  },  // Triple monitor
+  { type: 'ELIZA_BOOK',    col: 22, row: 7  },   // Book on desk
 
-  // ── Reed's workstation (lower left) ──
-  { type: 'DESK_FRONT', col: 2, row: 10 },
-  { type: 'PC_FRONT_ON', col: 3, row: 10 },        // Laptop ON desk (same row)
-  { type: 'CUSHIONED_BENCH', col: 3, row: 11 },
+  // ── Wall items — upper section ──
+  { type: 'ELIZA_BOOKSHELF', col: 2,  row: 5  },  // Bookshelves
+  { type: 'ELIZA_BOOKSHELF', col: 6,  row: 5  },
+  { type: 'ELIZA_TV',        col: 12, row: 2  },  // TV on wall
+  { type: 'ELIZA_MAILBOXES', col: 18, row: 3  },  // Mailboxes
+  { type: 'ELIZA_DESK_LAMP', col: 10, row: 7  },  // Desk lamp between desks
+  { type: 'ELIZA_TABLE_LAMP',col: 7,  row: 7  },  // Table lamp
+  { type: 'ELIZA_CURTAINS',  col: 1,  row: 2  },  // Curtains left
+  { type: 'ELIZA_CURTAINS',  col: 4,  row: 2  },  // Curtains center
+  { type: 'ELIZA_CURTAINS',  col: 21, row: 2  },  // Curtains right
+  { type: 'ELIZA_CURTAINS',  col: 24, row: 2  },  // Curtains far right
 
-  // ── Sentinel's workstation (lower center) ──
-  { type: 'DESK_FRONT', col: 5, row: 10 },
-  { type: 'PC_FRONT_ON', col: 6, row: 10 },        // Laptop ON desk (same row)
-  { type: 'CUSHIONED_BENCH', col: 6, row: 11 },
+  // ── Corridor (rows 16-19) ──
+  { type: 'ELIZA_FLOOR_LAMP', col: 24, row: 8  },  // Floor lamp near divider
+  { type: 'ELIZA_PLANTER',   col: 16, row: 19 },   // Planter in corridor
 
-  // ── Tide's workstation (lower right) ──
-  { type: 'DESK_FRONT', col: 8, row: 10 },
-  { type: 'PC_FRONT_ON', col: 9, row: 10 },        // Laptop ON desk (same row)
-  { type: 'CUSHIONED_CHAIR', col: 9, row: 11 },
+  // ── Break room (right side, cols 28-39) ──
+  // Kitchen counter back wall (row 4)
+  { type: 'ELIZA_COUNTERTOP', col: 28, row: 4  },
+  { type: 'ELIZA_COUNTERTOP', col: 31, row: 4  },
+  { type: 'ELIZA_COUNTERTOP', col: 34, row: 4  },
+  { type: 'ELIZA_COFFEEMAKER', col: 28, row: 3 },  // Coffee maker on counter
+  { type: 'ELIZA_WATERCOOLER', col: 27, row: 3 },  // Water cooler
+  { type: 'ELIZA_FRIDGE',     col: 37, row: 3  },  // Fridge
+  // Upper cabinets on wall
+  { type: 'ELIZA_CABINET',    col: 29, row: 2  },
+  { type: 'ELIZA_CABINET',    col: 30, row: 2  },
+  { type: 'ELIZA_CABINET',    col: 32, row: 2  },
+  { type: 'ELIZA_CABINET',    col: 34, row: 2  },
+  { type: 'ELIZA_CABINET',    col: 36, row: 2  },
+  { type: 'ELIZA_SINK',       col: 33, row: 4  },  // Sink on counter
+  // Kitchen table with stools (rows 9-12)
+  { type: 'ELIZA_TABLE',      col: 34, row: 9  },
+  { type: 'ELIZA_TABLE',      col: 34, row: 10 },
+  { type: 'ELIZA_STOOL',      col: 31, row: 9  },
+  { type: 'ELIZA_STOOL',      col: 31, row: 11 },
+  { type: 'ELIZA_STOOL',      col: 37, row: 9  },
+  { type: 'ELIZA_STOOL',      col: 37, row: 10 },
+  { type: 'ELIZA_STOOL',      col: 33, row: 12 },
+  { type: 'ELIZA_STOOL',      col: 35, row: 12 },
+  { type: 'ELIZA_KITCHEN_CLUTTER', col: 35, row: 4 },  // Kitchen clutter
+  { type: 'ELIZA_RUNNER',    col: 33, row: 7  },   // Runner rug
+  // Copy machine
+  { type: 'ELIZA_COPY_MACHINE', col: 36, row: 15 },
 
-  // ── Break room (enclosed room, cols 13-18, rows 3-13) ──
-  // Kitchenette counter flush against back wall (row 3)
-  { type: 'SMALL_TABLE_FRONT', col: 14, row: 3 },   // Counter left
-  { type: 'SMALL_TABLE_FRONT', col: 15, row: 3 },   // Counter center
-  { type: 'SMALL_TABLE_FRONT', col: 16, row: 3 },   // Counter center-right
-  { type: 'SMALL_TABLE_FRONT', col: 17, row: 3 },   // Counter right
-  { type: 'SINK', col: 14, row: 3 },                // Sink ON counter (left)
-  { type: 'COFFEE_MAKER', col: 15, row: 3 },        // Coffee maker ON counter (center)
-  { type: 'WATER_COOLER', col: 17, row: 3 },        // Water cooler ON counter (right end)
+  // ── Lower section: Reed's workstation ──
+  { type: 'ELIZA_DESK',    col: 4,  row: 27 },
+  { type: 'ELIZA_CHAIR',   col: 3,  row: 26 },
+  { type: 'ELIZA_MONITOR3',col: 3,  row: 26 },   // Triple monitor
+  { type: 'ELIZA_PAPER',   col: 6,  row: 26 },
+  { type: 'ELIZA_MUG',     col: 3,  row: 26 },
 
-  // Dining table in kitchen area (tile floor, rows 5-6)
-  { type: 'SMALL_TABLE_FRONT', col: 15, row: 6 },   // Dining table
-  { type: 'CUSHIONED_BENCH', col: 14, row: 6 },     // Chair left of table
-  { type: 'CUSHIONED_CHAIR', col: 16, row: 6 },     // Chair right of table
-  { type: 'ROTARY_PHONE', col: 15, row: 6 },        // Phone on dining table
+  // ── Lower section: Sentinel's workstation ──
+  { type: 'ELIZA_DESK',    col: 12, row: 27 },
+  { type: 'ELIZA_CHAIR',   col: 12, row: 25 },
+  { type: 'ELIZA_LAPTOP',  col: 12, row: 17 },   // Laptop on lower desk (row 17 = corridor area desk)
+  { type: 'ELIZA_TABLE_LAMP', col: 14, row: 17 }, // Lamp
 
-  // Lounge area — couch + armchair facing each other around coffee table
-  { type: 'RUG', col: 14, row: 9 },                 // Large rug under lounge seating
-  { type: 'SOFA_FRONT', col: 15, row: 11 },         // Couch on south side facing up
-  { type: 'COFFEE_TABLE', col: 15, row: 10 },       // Coffee table in the middle
-  { type: 'CUSHIONED_CHAIR', col: 14, row: 9 },     // Armchair left, facing right
-  { type: 'SOFA_SIDE', col: 17, row: 10 },          // Side sofa (right arm) facing left
+  // ── Lower section: Tide's workstation ──
+  { type: 'ELIZA_DESK',    col: 20, row: 27 },
+  { type: 'ELIZA_CHAIR',   col: 21, row: 25 },
+  { type: 'ELIZA_MONITOR3', col: 21, row: 26 }, // Monitor
+  { type: 'ELIZA_PHONE',   col: 5,  row: 25 },  // Phone on desk
 
-  // Arcade cabinet in corner
-  { type: 'ARCADE_CABINET', col: 18, row: 7 },      // Arcade game in upper-right corner
+  // ── Corridor / shared area desks (rows 16-19) ──
+  { type: 'ELIZA_CHAIR',   col: 12, row: 16 },   // Extra chair
+  { type: 'ELIZA_DESK',    col: 12, row: 18 },   // Meeting/solo desk in corridor
+  { type: 'ELIZA_BOOK',    col: 10, row: 17 },   // Book on desk
 
-  // Misc
-  { type: 'BIN', col: 13, row: 13 },                // Bin near door
-
-  // ── Plants ──
-  { type: 'PLANT', col: 1, row: 4 },                // Plant near Fern's area (left wall)
-  { type: 'PLANT_2', col: 18, row: 4 },             // Plant far right (break room corner)
-  { type: 'LARGE_PLANT', col: 17, row: 13 },        // Large plant in break room lounge corner (moved from counter)
-  { type: 'CACTUS', col: 11, row: 4 },              // Cactus in work area
-  { type: 'PLANT', col: 18, row: 12 },              // Plant in break room far corner
-  { type: 'PLANT_2', col: 13, row: 10 },            // Plant by lounge area
-  { type: 'PLANT_3', col: 14, row: 12 },            // Plant by sofa
-
-  // ── Wall decorations — work area (on the wall, row 2) ──
-  { type: 'DOUBLE_BOOKSHELF', col: 1, row: 2 },     // Bookshelf left wall
-  { type: 'BOOKSHELF', col: 3, row: 2 },             // Bookshelf near Fern
-  { type: 'SMALL_PAINTING', col: 5, row: 2 },        // Portrait
-  { type: 'CLOCK', col: 6, row: 2 },                 // Clock on wall
-  { type: 'PORTRAIT_3', col: 7, row: 2 },            // New portrait variant between desks
-  { type: 'LARGE_PAINTING', col: 8, row: 2 },        // TV widescreen (3 tiles: col 8-10)
-  { type: 'HANGING_PLANT', col: 4, row: 2 },         // Hanging plant left wall
-  { type: 'BOOKSHELF', col: 11, row: 2 },            // Single bookshelf right side (after TV)
-
-  // ── Wall decorations — break room (on the wall, row 2) ──
-  { type: 'HANGING_PLANT', col: 18, row: 2 },        // Hanging plant break room right
-  { type: 'WALL_CLOCK_2', col: 14, row: 2 },          // Decorative clock in break room
-  { type: 'SMALL_PAINTING_2', col: 16, row: 2 },     // Portrait in break room
-  { type: 'PORTRAIT_4', col: 17, row: 2 },           // Another portrait for variety
-
-  // ── Desk accessories (lived-in touches) ──
-  { type: 'COFFEE', col: 2, row: 5 },               // Coffee cup on Fern's desk
-  { type: 'POT', col: 8, row: 5 },                  // Small pot on Scout's desk
-
-  // ── Copy machine & mailboxes ──
-  { type: 'COPY_MACHINE', col: 1, row: 13 },         // Copy machine in lower-left corner
-  { type: 'MAILBOXES', col: 11, row: 13 },           // Mailboxes near right wall
+  // ── Misc items ──
+  { type: 'ELIZA_CABINET_SMALL', col: 3,  row: 3  },  // Small cabinet / printer area
+  { type: 'ELIZA_PRINTER', col: 5,  row: 3  },   // Printer on top
 ]
 
 // ── Layout data ────────────────────────────────────────────────
@@ -191,8 +186,7 @@ export const FURNITURE_LAYOUT: FurniturePlacement[] = [
 let layoutLoaded = false
 
 /**
- * Load the layout. In the new design this is synchronous (hardcoded),
- * but we keep the async signature for API compatibility.
+ * Load the layout. Synchronous (hardcoded from LDtk), async signature for API compatibility.
  */
 export async function loadLayout(): Promise<void> {
   if (layoutLoaded) return
@@ -221,17 +215,16 @@ export function buildCollisionGrid() {
     collisionGrid[r] = []
     for (let c = 0; c < GRID_COLS; c++) {
       const tile = LAYOUT[r]?.[c] ?? 255
-      // Walls (0) and void (255) are not walkable; floor (1), break room (2), kitchen tile (3) are walkable
+      // Walls (0) are not walkable; floor (1,2) is walkable
       collisionGrid[r][c] = tile === 0 || tile === 255
     }
   }
 
-  // Mark furniture tiles as blocked
+  // Mark blocking furniture tiles
   const blockingTypes = new Set([
-    'DESK_FRONT', 'DESK_SIDE', 'TABLE_FRONT', 'SMALL_TABLE_FRONT', 'SMALL_TABLE_SIDE',
-    'DOUBLE_BOOKSHELF', 'BOOKSHELF', 'COFFEE_TABLE',
-    'SOFA_FRONT', 'SOFA_BACK', 'SOFA_SIDE',
-    'COPY_MACHINE', 'MAILBOXES', 'ARCADE_CABINET',
+    'ELIZA_DESK', 'ELIZA_BOOKSHELF', 'ELIZA_CABINET', 'ELIZA_CABINET_SMALL',
+    'ELIZA_TABLE', 'ELIZA_COPY_MACHINE', 'ELIZA_FRIDGE',
+    'ELIZA_COUNTERTOP', 'ELIZA_TV',
   ])
 
   for (const item of FURNITURE_LAYOUT) {
@@ -254,8 +247,7 @@ export function getTile(tx: number, ty: number): TileType {
   if (val === undefined) return 'empty'
   if (val === 0) return 'wall'
   if (val === 255) return 'empty'
-  if (val === 2) return 'floor_break'
-  if (val === 3) return 'floor_kitchen'
+  if (val === 2) return 'floor_tile'
   return 'floor_wood'
 }
 

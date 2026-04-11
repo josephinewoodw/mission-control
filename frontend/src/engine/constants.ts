@@ -1,19 +1,22 @@
-/** Canvas dimensions — native pixel resolution at 32px tiles */
-/** 20 cols x 15 rows = 640x480 */
+/** Canvas dimensions — native pixel resolution at 16px tiles */
+/** 40 cols x 30 rows = 640x480 */
 export const CANVAS_W = 640
 export const CANVAS_H = 480
 
-/** Tile size in pixels (LPC native) */
-export const TILE = 32
+/** Tile size in pixels (Eliza/LDtk native 16px) */
+export const TILE = 16
 
 /** Grid dimensions */
-export const GRID_COLS = 20
-export const GRID_ROWS = 15
+export const GRID_COLS = 40
+export const GRID_ROWS = 30
 
 /** Sprite frame size from LPC spritesheets (source) */
 export const FRAME_SIZE = 64
 
-/** Rendered sprite size — 1.5 tiles tall for LPC characters at 32px tile scale */
+/**
+ * Rendered sprite size — kept at 48px for character visibility.
+ * With TILE=16, characters are 3 tiles tall (good proportions).
+ */
 export const SPRITE_SIZE = 48
 
 /** Spritesheet layout: 13 columns, 54 rows */
@@ -52,24 +55,20 @@ export const IDLE_MAX_MS = 35_000
  * Agent desk positions (pixel coords of sprite anchor, top-left of sprite).
  * Characters sit in chairs in front of their desks.
  *
- * Layout (20x15 grid at 32px):
- *   Row 0-2: walls
- *   Row 3: wall decorations
- *   Row 4-5: desks for Fern (cols 2-4), Timber (cols 5-7), Scout (cols 8-10)
- *   Row 6-7: chairs for Fern (col 3), Timber (col 6), Scout (col 9)
- *   Row 8: corridor
- *   Row 9-10: desks for Reed (cols 2-4), Sentinel (cols 5-7), and Tide (cols 8-10)
- *   Row 11-12: chairs for Reed (col 3), Sentinel (col 6), and Tide (col 9)
- *   Row 13: bottom area
- *   Row 14: bottom wall
+ * Layout (40x30 grid at 16px tiles, from LDtk):
+ *   Rows 0-5: top wall
+ *   Row 6: first floor row
+ *   Upper desk area (rows 6-15): chairs at row 7
+ *   Corridor (rows 16-19): open floor, no divider
+ *   Lower desk area (rows 20-29): chairs at rows 25-26
  *
- * Chair positions (where characters sit):
- *   Fern:     col 3, row 6
- *   Timber:   col 6, row 6
- *   Scout:    col 9, row 6
- *   Reed:     col 3, row 11
- *   Sentinel: col 6, row 11
- *   Tide:     col 9, row 11
+ * Chair tile positions (from LDtk entity data):
+ *   fern:     col 4,  row 7
+ *   timber:   col 12, row 7
+ *   scout:    col 20, row 7
+ *   reed:     col 3,  row 26
+ *   sentinel: col 12, row 25
+ *   tide:     col 21, row 25
  *
  * Formula: sprite center aligns with tile center.
  *   tile center = col * TILE + TILE/2
@@ -78,16 +77,16 @@ export const IDLE_MAX_MS = 35_000
 const half = Math.floor(SPRITE_SIZE / 2)
 const tileCenter = TILE / 2
 export const DESK_POSITIONS: Record<string, { x: number; y: number }> = {
-  fern:     { x: 3 * TILE + tileCenter - half, y: 6 * TILE + tileCenter - half },
-  timber:   { x: 6 * TILE + tileCenter - half, y: 6 * TILE + tileCenter - half },
-  scout:    { x: 9 * TILE + tileCenter - half, y: 6 * TILE + tileCenter - half },
-  reed:     { x: 3 * TILE + tileCenter - half, y: 11 * TILE + tileCenter - half },
-  sentinel: { x: 6 * TILE + tileCenter - half, y: 11 * TILE + tileCenter - half },
-  tide:     { x: 9 * TILE + tileCenter - half, y: 11 * TILE + tileCenter - half },
+  fern:     { x: 4  * TILE + tileCenter - half, y: 7  * TILE + tileCenter - half },
+  timber:   { x: 12 * TILE + tileCenter - half, y: 7  * TILE + tileCenter - half },
+  scout:    { x: 20 * TILE + tileCenter - half, y: 7  * TILE + tileCenter - half },
+  reed:     { x: 3  * TILE + tileCenter - half, y: 26 * TILE + tileCenter - half },
+  sentinel: { x: 12 * TILE + tileCenter - half, y: 25 * TILE + tileCenter - half },
+  tide:     { x: 21 * TILE + tileCenter - half, y: 25 * TILE + tileCenter - half },
 }
 
-/** Break room coffee area — in front of counter, near coffee maker at col 15, row 4 */
-export const COFFEE_POS = { x: 15 * TILE + tileCenter, y: 6 * TILE + tileCenter }
+/** Break room coffee area — in front of coffee maker at col 28, row 5 (below counter) */
+export const COFFEE_POS = { x: 28 * TILE + tileCenter, y: 7 * TILE + tileCenter }
 
 /** Max delta time clamp (ms) — prevents huge jumps after tab switch */
 export const MAX_DT = 100

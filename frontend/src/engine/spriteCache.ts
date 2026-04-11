@@ -132,6 +132,243 @@ export function getAllFurnitureAssets(): Map<string, FurnitureAssetInfo> {
 //   - width/height: the DRAWN size in pixels (native, no scaling)
 //   - footprintW/H: tiles occupied on the 32px grid
 
+// ── Eliza tileset furniture definitions (native 16px scale) ────────────────
+// These are the Eliza asset pack furniture items used in the LDtk layout.
+// Assets are in /public/eliza/... — served from the frontend.
+// Note: Eliza assets are at 16px native grid scale, matching our new TILE=16.
+// Width/height here are the DRAWN sizes in pixels (matching LDtk tile source rects).
+
+const ELIZA_FURNITURE: FurnitureAssetInfo[] = [
+  // ── Desk, Office (96x64, 3-tile wide front-facing desk) ──
+  {
+    id: 'ELIZA_DESK', name: 'Office Desk', category: 'desk',
+    width: 96, height: 64, footprintW: 6, footprintH: 4, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/Desk, Office.png',
+    sourceRect: { sx: 0, sy: 0, sw: 96, sh: 64 },
+  },
+  // ── Chair, Office (32x64 front-facing) ──
+  {
+    id: 'ELIZA_CHAIR', name: 'Office Chair', category: 'seating',
+    width: 32, height: 64, footprintW: 2, footprintH: 4, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/seating/Chair, Office.png',
+    sourceRect: { sx: 0, sy: 32, sw: 32, sh: 64 },
+  },
+  // ── Laptop (32x32 on desk) ──
+  {
+    id: 'ELIZA_LAPTOP', name: 'Laptop', category: 'electronics',
+    width: 32, height: 32, footprintW: 2, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/eliza/objects/small-items/Laptop.png',
+    sourceRect: { sx: 64, sy: 96, sw: 32, sh: 32 },
+    canPlaceOnSurfaces: true,
+  },
+  // ── Monitor (single, 32x32) — Modern Office Recolored ──
+  {
+    id: 'ELIZA_MONITOR', name: 'Monitor', category: 'electronics',
+    width: 32, height: 32, footprintW: 2, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/modern-office/Modern_Office_Black_Shadow.png',
+    sourceRect: { sx: 224, sy: 128, sw: 32, sh: 32 },
+    canPlaceOnSurfaces: true,
+  },
+  // ── Monitors x3 (48x32) — three-monitor setup ──
+  {
+    id: 'ELIZA_MONITOR3', name: 'Triple Monitor', category: 'electronics',
+    width: 48, height: 32, footprintW: 3, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/modern-office/Modern_Office_Black_Shadow.png',
+    sourceRect: { sx: 208, sy: 128, sw: 48, sh: 32 },
+    canPlaceOnSurfaces: true,
+  },
+  // ── Loose Paper (32x32) ──
+  {
+    id: 'ELIZA_PAPER', name: 'Papers', category: 'decor',
+    width: 32, height: 32, footprintW: 2, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/eliza/objects/small-items/Loose Paper.png',
+    sourceRect: { sx: 64, sy: 64, sw: 32, sh: 32 },
+    canPlaceOnSurfaces: true,
+  },
+  // ── Coffee Mug (32x32) ──
+  {
+    id: 'ELIZA_MUG', name: 'Coffee Mug', category: 'decor',
+    width: 32, height: 32, footprintW: 2, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/eliza/objects/small-items/Coffee Maker.png',
+    sourceRect: { sx: 64, sy: 32, sw: 32, sh: 32 },
+    canPlaceOnSurfaces: true,
+  },
+  // ── Cabinet (32x48 upper cabinet) ──
+  {
+    id: 'ELIZA_CABINET', name: 'Cabinet', category: 'storage',
+    width: 32, height: 48, footprintW: 2, footprintH: 3, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/Cabinet.png',
+    sourceRect: { sx: 192, sy: 0, sw: 32, sh: 48 },
+    canPlaceOnWalls: true,
+  },
+  // ── Cabinet small (64x48 — bookshelf variant) ──
+  {
+    id: 'ELIZA_CABINET_SMALL', name: 'Bookshelf Cabinet', category: 'storage',
+    width: 64, height: 48, footprintW: 4, footprintH: 3, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/Cabinet.png',
+    sourceRect: { sx: 160, sy: 128, sw: 64, sh: 48 },
+    canPlaceOnWalls: true,
+  },
+  // ── Bookshelves (64x48 variant) ──
+  {
+    id: 'ELIZA_BOOKSHELF', name: 'Bookshelf', category: 'storage',
+    width: 64, height: 48, footprintW: 4, footprintH: 3, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/Cabinet.png',
+    sourceRect: { sx: 160, sy: 128, sw: 64, sh: 48 },
+    canPlaceOnWalls: true,
+  },
+  // ── Countertop (64x48 front-facing) ──
+  {
+    id: 'ELIZA_COUNTERTOP', name: 'Countertop', category: 'furniture',
+    width: 64, height: 48, footprintW: 4, footprintH: 3, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/Countertop.png',
+    sourceRect: { sx: 64, sy: 80, sw: 64, sh: 48 },
+  },
+  // ── Coffee Maker (32x32) ──
+  {
+    id: 'ELIZA_COFFEEMAKER', name: 'Coffee Maker', category: 'appliance',
+    width: 32, height: 32, footprintW: 2, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/eliza/objects/small-items/Coffee Maker.png',
+    sourceRect: { sx: 0, sy: 32, sw: 32, sh: 32 },
+    canPlaceOnSurfaces: true,
+  },
+  // ── Water Cooler (32x64) ──
+  {
+    id: 'ELIZA_WATERCOOLER', name: 'Water Cooler', category: 'appliance',
+    width: 32, height: 64, footprintW: 2, footprintH: 4, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/Water Cooler.png',
+    sourceRect: { sx: 32, sy: 0, sw: 32, sh: 64 },
+  },
+  // ── Fridge (32x64) ──
+  {
+    id: 'ELIZA_FRIDGE', name: 'Fridge', category: 'appliance',
+    width: 32, height: 64, footprintW: 2, footprintH: 4, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/Fridge.png',
+    sourceRect: { sx: 32, sy: 0, sw: 32, sh: 64 },
+  },
+  // ── Sink Countertop (32x32) ──
+  {
+    id: 'ELIZA_SINK', name: 'Sink', category: 'appliance',
+    width: 32, height: 32, footprintW: 2, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/Sink, Countertop.png',
+    sourceRect: { sx: 32, sy: 32, sw: 32, sh: 32 },
+    canPlaceOnSurfaces: true,
+  },
+  // ── Table / island (96x64) ──
+  {
+    id: 'ELIZA_TABLE', name: 'Counter Table', category: 'furniture',
+    width: 96, height: 64, footprintW: 6, footprintH: 4, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/Countertop.png',
+    sourceRect: { sx: 96, sy: 128, sw: 96, sh: 64 },
+  },
+  // ── Bar Stool (32x32) ──
+  {
+    id: 'ELIZA_STOOL', name: 'Bar Stool', category: 'seating',
+    width: 32, height: 32, footprintW: 2, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/seating/Bar Stools.png',
+    sourceRect: { sx: 32, sy: 0, sw: 32, sh: 32 },
+  },
+  // ── TV Widescreen (96x64) ──
+  {
+    id: 'ELIZA_TV', name: 'TV Widescreen', category: 'electronics',
+    width: 96, height: 64, footprintW: 6, footprintH: 4, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/TV, Widescreen.png',
+    sourceRect: { sx: 128, sy: 0, sw: 96, sh: 64 },
+    canPlaceOnWalls: true,
+  },
+  // ── Mailboxes (64x64) ──
+  {
+    id: 'ELIZA_MAILBOXES', name: 'Mailboxes', category: 'storage',
+    width: 64, height: 64, footprintW: 4, footprintH: 4, backgroundTiles: 0,
+    imagePath: '/eliza/objects/wall-items/Mailboxes (tiling).png',
+    sourceRect: { sx: 16, sy: 16, sw: 64, sh: 64 },
+    canPlaceOnWalls: true,
+  },
+  // ── Copy Machine (64x48) ──
+  {
+    id: 'ELIZA_COPY_MACHINE', name: 'Copy Machine', category: 'appliance',
+    width: 64, height: 48, footprintW: 4, footprintH: 3, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/Copy Machine.png',
+    sourceRect: { sx: 0, sy: 16, sw: 64, sh: 48 },
+  },
+  // ── Floor Lamp (32x64) ──
+  {
+    id: 'ELIZA_FLOOR_LAMP', name: 'Floor Lamp', category: 'decor',
+    width: 32, height: 64, footprintW: 2, footprintH: 4, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/Lighting, Floor.png',
+    sourceRect: { sx: 128, sy: 64, sw: 32, sh: 64 },
+  },
+  // ── Desk Lamp (32x48) ──
+  {
+    id: 'ELIZA_DESK_LAMP', name: 'Desk Lamp', category: 'decor',
+    width: 32, height: 48, footprintW: 2, footprintH: 3, backgroundTiles: 0,
+    imagePath: '/eliza/objects/small-items/Lighting, Table.png',
+    sourceRect: { sx: 224, sy: 16, sw: 32, sh: 48 },
+    canPlaceOnSurfaces: true,
+  },
+  // ── Table Lamp (32x32) ──
+  {
+    id: 'ELIZA_TABLE_LAMP', name: 'Table Lamp', category: 'decor',
+    width: 32, height: 32, footprintW: 2, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/eliza/objects/small-items/Lighting, Table.png',
+    sourceRect: { sx: 64, sy: 0, sw: 32, sh: 32 },
+    canPlaceOnSurfaces: true,
+  },
+  // ── Curtains (32x48) — from Cozy Cottage decoration ──
+  {
+    id: 'ELIZA_CURTAINS', name: 'Curtains', category: 'decor',
+    width: 32, height: 48, footprintW: 2, footprintH: 3, backgroundTiles: 0,
+    imagePath: '/cozy-cottage/decoration.png',
+    sourceRect: { sx: 400, sy: 0, sw: 32, sh: 48 },
+    canPlaceOnWalls: true,
+  },
+  // ── Planter (32x64) ──
+  {
+    id: 'ELIZA_PLANTER', name: 'Planter', category: 'decor',
+    width: 32, height: 64, footprintW: 2, footprintH: 4, backgroundTiles: 0,
+    imagePath: '/eliza/objects/furniture/Planter.png',
+    sourceRect: { sx: 128, sy: 32, sw: 32, sh: 64 },
+  },
+  // ── Kitchen Clutter (32x32) ──
+  {
+    id: 'ELIZA_KITCHEN_CLUTTER', name: 'Kitchen Clutter', category: 'decor',
+    width: 32, height: 32, footprintW: 2, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/eliza/objects/small-items/Kitchen Clutter A.png',
+    sourceRect: { sx: 160, sy: 64, sw: 32, sh: 32 },
+    canPlaceOnSurfaces: true,
+  },
+  // ── Kitchen Runner (32x32) ──
+  {
+    id: 'ELIZA_RUNNER', name: 'Kitchen Runner', category: 'decor',
+    width: 32, height: 32, footprintW: 2, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/eliza/objects/small-items/Kitchen Clutter A.png',
+    sourceRect: { sx: 64, sy: 32, sw: 32, sh: 32 },
+  },
+  // ── Book (16x16) — small desk item ──
+  {
+    id: 'ELIZA_BOOK', name: 'Book', category: 'decor',
+    width: 16, height: 16, footprintW: 1, footprintH: 1, backgroundTiles: 0,
+    imagePath: '/modern-office/Modern_Office_Black_Shadow.png',
+    sourceRect: { sx: 16, sy: 240, sw: 16, sh: 16 },
+    canPlaceOnSurfaces: true,
+  },
+  // ── Printer (16x32) ──
+  {
+    id: 'ELIZA_PRINTER', name: 'Printer', category: 'electronics',
+    width: 16, height: 32, footprintW: 1, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/modern-office/Modern_Office_Black_Shadow.png',
+    sourceRect: { sx: 160, sy: 384, sw: 16, sh: 32 },
+  },
+  // ── Phone (16x32) ──
+  {
+    id: 'ELIZA_PHONE', name: 'Phone', category: 'electronics',
+    width: 16, height: 32, footprintW: 1, footprintH: 2, backgroundTiles: 0,
+    imagePath: '/modern-office/Modern_Office_Black_Shadow.png',
+    sourceRect: { sx: 112, sy: 416, sw: 16, sh: 32 },
+    canPlaceOnSurfaces: true,
+  },
+]
+
 const LPC_FURNITURE: FurnitureAssetInfo[] = [
   // ── Desks (Ornate Desk — 96x64 front-facing at row 1 of sheet) ──
   {
@@ -419,6 +656,15 @@ export function preloadTileAssets(): Promise<void> {
     // Load wall tile
     const wallPromise = loadTileImage(WALL_TILE_PATH).catch(() => null)
 
+    // Load Eliza floor/wall tilesets (including Painted Walls for overlay)
+    const elizaStructurePaths = [
+      '/eliza/structure/floor/Wood Floor A.png',
+      '/eliza/structure/floor/Tile B.png',
+      '/eliza/structure/walls/Brick Wall A.png',
+      '/eliza/structure/walls/Painted Walls.png',  // 1536x512 — painted wall overlay
+    ]
+    const elizaStructurePromises = elizaStructurePaths.map(p => loadTileImage(p).catch(() => null))
+
     // Register LPC furniture assets and load their images
     const lpcImagePaths = new Set<string>()
     for (const asset of LPC_FURNITURE) {
@@ -427,7 +673,15 @@ export function preloadTileAssets(): Promise<void> {
     }
     const lpcPromises = [...lpcImagePaths].map(p => loadTileImage(p).catch(() => null))
 
-    await Promise.all([...floorPromises, wallPromise, ...lpcPromises])
+    // Register Eliza furniture assets and load their images
+    const elizaImagePaths = new Set<string>()
+    for (const asset of ELIZA_FURNITURE) {
+      furnitureAssets.set(asset.id, asset)
+      if (asset.imagePath) elizaImagePaths.add(asset.imagePath)
+    }
+    const elizaPromises = [...elizaImagePaths].map(p => loadTileImage(p).catch(() => null))
+
+    await Promise.all([...floorPromises, wallPromise, ...elizaStructurePromises, ...lpcPromises, ...elizaPromises])
     tilesLoaded = true
   })()
 

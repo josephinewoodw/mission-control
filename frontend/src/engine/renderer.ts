@@ -1,80 +1,96 @@
 import { CANVAS_W, CANVAS_H, TILE, COLORS, FRAME_SIZE, SPRITE_SIZE } from './constants'
 import type { Character } from './character'
 import type { AgentName } from '../types'
-import { getTile, getLayoutMap } from './tileMap'
-import { getSprite, getTileImage, getColorizedTile, getWallPiece } from './spriteCache'
+import { getLayoutMap } from './tileMap'
+import { getSprite, getTileImage } from './spriteCache'
 import { drawFurniture, drawBreakRoom, drawWallDecorations } from './furniture'
 
-// ── Floor tile paths for sprite lookup ───────────────────────────
-const FLOOR_TILE_PATHS = Array.from({ length: 9 }, (_, i) => `/pixel-agents/floors/floor_${i}.png`)
+// ── Eliza tileset paths ───────────────────────────────────────────
+const ELIZA_WOOD_FLOOR_PATH   = '/eliza/structure/floor/Wood Floor A.png'
+const ELIZA_TILE_FLOOR_PATH   = '/eliza/structure/floor/Tile B.png'
+const ELIZA_WALL_PATH         = '/eliza/structure/walls/Brick Wall A.png'
+const ELIZA_PAINTED_WALL_PATH = '/eliza/structure/walls/Painted Walls.png'
 
 /**
- * Default warm-wood HSL for floor colorization.
- * Gives a warm brown tone to the grayscale floor tiles.
+ * Eliza Wood Floor A tileset: 160x192px, 10x12 grid of 16px tiles.
+ * We use tiles from row 2-5 (warm wood planks).
+ * Each call picks a tile based on (tx+ty) % to create a natural pattern.
  */
-const FLOOR_HSL = { h: 30, s: 30, b: -10, c: 0 }
+function drawElizaFloorTile(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  tx: number,
+  ty: number,
+  x: number,
+  y: number,
+  tileType: 1 | 2,
+) {
+  ctx.imageSmoothingEnabled = false
 
-/** Floor colors by tile type */
-const FLOOR_COLOR_WORK = '#4a3828'       // Warm wood for work area
-const FLOOR_COLOR_BREAK = '#3a3a42'      // Cooler blue-gray tone for break room
-const KITCHEN_TILE_LIGHT = '#c8bfaa'     // Light cream/beige tile
-const KITCHEN_TILE_DARK = '#a89880'      // Darker warm tile for checkerboard
+  if (tileType === 2) {
+    // Tile floor (break room) — use Tile B tileset
+    const tileImg = getTileImage(ELIZA_TILE_FLOOR_PATH)
+    if (tileImg) {
+      // Tile B is 128x128, 8x8 grid of 16px tiles — use a natural pattern
+      const srcCol = ((tx * 3 + ty * 7) % 5)
+      const srcRow = 4 + ((tx + ty * 2) % 3)
+      ctx.drawImage(tileImg, srcCol * 16, srcRow * 16, 16, 16, x, y, TILE, TILE)
+      return
+    }
+    // Fallback
+    ctx.fillStyle = (tx + ty) % 2 === 0 ? '#c8bfaa' : '#a89880'
+    ctx.fillRect(x, y, TILE, TILE)
+    return
+  }
 
-/** Draw the floor layer using Pixel Agents floor tiles at 2x scale (16px -> 32px) */
+  // Wood floor — use Wood Floor A tileset
+  // The tileset has multiple wood plank variants to create visual variety
+  // Use columns 0-3 (natural wood grain rows) cycling through patterns
+  const srcCol = ((tx * 2 + ty) % 5)
+  const srcRow = 2 + ((tx + ty * 3) % 4)
+  ctx.drawImage(img, srcCol * 16, srcRow * 16, 16, 16, x, y, TILE, TILE)
+}
+
+/** Draw the floor layer using Eliza tileset assets at 1:1 scale (TILE=16) */
 function drawFloor(ctx: CanvasRenderingContext2D) {
   const layout = getLayoutMap()
   const rows = layout.length
   const cols = rows > 0 ? layout[0].length : 0
 
+  const woodImg = getTileImage(ELIZA_WOOD_FLOOR_PATH)
+
   for (let ty = 0; ty < rows; ty++) {
     for (let tx = 0; tx < cols; tx++) {
       const tileVal = layout[ty]?.[tx]
 
-      // Skip walls (handled separately) and void tiles
+      // Skip walls and void tiles
       if (tileVal === 0 || tileVal === 255 || tileVal === undefined) continue
 
       const x = tx * TILE
       const y = ty * TILE
 
-      if (tileVal === 3) {
-        // Kitchenette checkerboard tile floor
-        const isLight = (tx + ty) % 2 === 0
-        ctx.fillStyle = isLight ? KITCHEN_TILE_LIGHT : KITCHEN_TILE_DARK
-        ctx.fillRect(x, y, TILE, TILE)
-        // Grout lines for tile effect
-        ctx.fillStyle = 'rgba(90,80,65,0.4)'
-        ctx.fillRect(x, y + TILE - 1, TILE, 1)
-        ctx.fillRect(x + TILE - 1, y, 1, TILE)
-        // Subtle inner highlight for tile depth
-        ctx.fillStyle = 'rgba(255,255,255,0.08)'
-        ctx.fillRect(x + 1, y + 1, TILE - 2, 1)
-        ctx.fillRect(x + 1, y + 1, 1, TILE - 2)
+      if (woodImg) {
+        drawElizaFloorTile(ctx, woodImg, tx, ty, x, y, tileVal === 2 ? 2 : 1)
       } else {
-        // Different floor color for break room (tile value 2) vs work area (tile value 1)
-        ctx.fillStyle = tileVal === 2 ? FLOOR_COLOR_BREAK : FLOOR_COLOR_WORK
+        // Fallback solid color
+        ctx.fillStyle = tileVal === 2 ? '#3a4a55' : '#4a3828'
         ctx.fillRect(x, y, TILE, TILE)
-        // Subtle grid lines between tiles for depth
-        ctx.fillStyle = tileVal === 2 ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.08)'
-        ctx.fillRect(x, y + TILE - 1, TILE, 1) // horizontal line
-        ctx.fillRect(x + TILE - 1, y, 1, TILE) // vertical line
       }
     }
   }
 }
 
 /**
- * Default wall HSL — darker brown for walls.
- */
-const WALL_HSL = { h: 214, s: 30, b: -100, c: -55 }
-
-/**
- * Draw walls using Pixel Agents wall sprites at 2x scale with auto-tiling.
- * 4-bit bitmask: N=1, E=2, S=4, W=8.
+ * Draw walls using Eliza Brick Wall A tileset.
+ * The tileset is 192x288px, 12x18 grid of 16px tiles.
+ * We sample rows 12-17 (cols 8-9) which appear to be standard brick wall tiles.
  */
 function drawWalls(ctx: CanvasRenderingContext2D) {
   const layout = getLayoutMap()
   const rows = layout.length
   const cols = rows > 0 ? layout[0].length : 0
+
+  const wallImg = getTileImage(ELIZA_WALL_PATH)
 
   for (let ty = 0; ty < rows; ty++) {
     for (let tx = 0; tx < cols; tx++) {
@@ -84,26 +100,44 @@ function drawWalls(ctx: CanvasRenderingContext2D) {
       const x = tx * TILE
       const y = ty * TILE
 
-      // Build 4-bit bitmask from cardinal neighbors
-      let mask = 0
-      if (ty > 0 && layout[ty - 1]?.[tx] === 0) mask |= 1 // N
-      if (tx < cols - 1 && layout[ty]?.[tx + 1] === 0) mask |= 2 // E
-      if (ty < rows - 1 && layout[ty + 1]?.[tx] === 0) mask |= 4 // S
-      if (tx > 0 && layout[ty]?.[tx - 1] === 0) mask |= 8 // W
-
-      const wallPiece = getWallPiece(mask, WALL_HSL.h, WALL_HSL.s, WALL_HSL.b, WALL_HSL.c)
-      if (wallPiece) {
-        // wallPiece is already 32x64 (scaled 2x in spriteCache)
-        // Anchor at bottom of the tile cell
-        const pieceH = wallPiece.height
-        const drawY = y + TILE - pieceH
+      if (wallImg) {
         ctx.imageSmoothingEnabled = false
-        ctx.drawImage(wallPiece, x, drawY, TILE, pieceH)
+        // Use a natural brick pattern — vary slightly by position
+        const srcCol = 8 + (tx % 2)
+        const srcRow = 12 + (ty % 6)
+        ctx.drawImage(wallImg, srcCol * 16, srcRow * 16, 16, 16, x, y, TILE, TILE)
       } else {
         // Fallback: solid wall color
         ctx.fillStyle = COLORS.wallBase
         ctx.fillRect(x, y, TILE, TILE)
       }
+    }
+  }
+}
+
+/**
+ * Draw the Painted Walls overlay layer on top of brick walls.
+ * The Painted Walls tileset (1536x512) uses tiles at:
+ *   sx alternates 32/48 (2 tile variants), sy steps by 16 rows (256-336 = rows 16-21).
+ * This covers the left wall zone (cols 0-25, rows 0-5 in 16px grid).
+ * Data is from the LDtk Painted_Walls layer — 156 tiles covering x=0-400, y=0-80.
+ */
+function drawPaintedWalls(ctx: CanvasRenderingContext2D) {
+  const paintedImg = getTileImage(ELIZA_PAINTED_WALL_PATH)
+  if (!paintedImg) return
+
+  ctx.imageSmoothingEnabled = false
+  // The Painted_Walls layer covers rows 0-5 (y=0-95px), cols 0-25 (x=0-415px)
+  // Pattern: alternating sx=32/48 per tile column, sy advances with row (256,272,288,304,320,336)
+  const rows = 6
+  const cols = 26
+  for (let r = 0; r < rows; r++) {
+    const sy = 256 + r * 16  // 256, 272, 288, 304, 320, 336
+    for (let c = 0; c < cols; c++) {
+      const sx = c % 2 === 0 ? 32 : 48  // alternating tile variant
+      const x = c * TILE
+      const y = r * TILE
+      ctx.drawImage(paintedImg, sx, sy, 16, 16, x, y, TILE, TILE)
     }
   }
 }
@@ -385,16 +419,19 @@ export function render(
 ) {
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H)
 
-  // Layer 1: Floor tiles (Pixel Agents at 2x scale)
+  // Layer 1: Floor tiles (Eliza Wood Floor A + Tile B at 1:1 TILE=16 scale)
   drawFloor(ctx)
 
-  // Layer 2: Walls (Pixel Agents at 2x scale with auto-tiling)
+  // Layer 2: Walls (Eliza Brick Wall A at 1:1 scale)
   drawWalls(ctx)
+
+  // Layer 2.5: Painted wall overlay (Eliza Painted Walls on top of brick — left wall zone)
+  drawPaintedWalls(ctx)
 
   // Layer 3: Wall decorations (handled by furniture system)
   drawWallDecorations(ctx, time)
 
-  // Layer 4: Furniture (LPC sprites at native 32px, y-sorted)
+  // Layer 4: Furniture (Eliza + LPC sprites, y-sorted)
   drawFurniture(ctx)
   drawBreakRoom(ctx)
 
