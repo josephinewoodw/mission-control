@@ -10,10 +10,12 @@ const API_BASE = '/api'
 const POLL_INTERVAL_MS = 10_000
 
 export interface KanbanGrouped {
-  backlog: KanbanTask[]
+  queued: KanbanTask[]
   active: KanbanTask[]
   in_progress: KanbanTask[]
-  done: KanbanTask[]
+  completed: KanbanTask[]
+  failed: KanbanTask[]
+  stale: KanbanTask[]
 }
 
 interface UseKanbanReturn {
@@ -148,10 +150,12 @@ export function useKanban(): UseKanbanReturn {
 
   // Group tasks into columns
   const grouped: KanbanGrouped = {
-    backlog: tasks.filter(t => t.status === 'backlog'),
+    queued: tasks.filter(t => t.status === 'queued'),
     active: tasks.filter(t => t.status === 'active'),
     in_progress: tasks.filter(t => t.status === 'in_progress'),
-    done: tasks.filter(t => t.status === 'done').slice(0, 10),
+    completed: tasks.filter(t => t.status === 'completed').slice(0, 10),
+    failed: tasks.filter(t => t.status === 'failed'),
+    stale: tasks.filter(t => t.status === 'stale'),
   }
 
   return {

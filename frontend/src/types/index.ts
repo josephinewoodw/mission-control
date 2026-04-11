@@ -150,24 +150,11 @@ export interface TokenStats {
   heatmapCategories: string[]
 }
 
-/** Agent task from the task queue */
-export interface AgentTask {
-  id: number
-  agent_name: AgentName
-  title: string
-  description: string | null
-  status: 'queued' | 'in_progress' | 'active' | 'completed' | 'failed' | 'stale'
-  priority: number
-  created_at: number
-  started_at: number | null
-  completed_at: number | null
-  tool_use_id: string | null
-}
-
-/** Kanban task — persistent strategic backlog */
-export type KanbanStatus = 'backlog' | 'active' | 'in_progress' | 'done'
+/** Unified task status — used by both kanban board and agent task tracking */
+export type KanbanStatus = 'queued' | 'active' | 'in_progress' | 'completed' | 'failed' | 'stale'
 export type KanbanPriority = 'low' | 'medium' | 'high'
 
+/** Unified task — single source of truth for both kanban board and agent task queue */
 export interface KanbanTask {
   id: number
   title: string
@@ -179,6 +166,24 @@ export interface KanbanTask {
   updated_at: number
   activated_at: number | null
   completed_at: number | null
+  tool_use_id: string | null
+  session_id: string | null
+}
+
+/** Agent task — alias for unified KanbanTask for backward compat */
+export interface AgentTask {
+  id: number
+  agent_name: string
+  title: string
+  description: string | null
+  status: KanbanStatus
+  priority: KanbanPriority
+  created_at: number
+  updated_at: number
+  activated_at: number | null
+  completed_at: number | null
+  tool_use_id: string | null
+  session_id: string | null
 }
 
 /** Daily summary item */

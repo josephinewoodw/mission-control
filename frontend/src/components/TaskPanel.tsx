@@ -1,4 +1,7 @@
-import type { AgentTask, AgentName } from '../types'
+import type { KanbanTask, AgentName } from '../types'
+
+// AgentTask is now unified with KanbanTask
+type AgentTask = KanbanTask
 
 /** Tasks completed within this many ms get a "just completed" highlight */
 const JUST_COMPLETED_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
@@ -47,7 +50,7 @@ function statusBadge(task: AgentTask): { label: string; className: string } {
 
 function TaskItem({ task }: { task: AgentTask }) {
   const badge = statusBadge(task)
-  const timeTs = task.completed_at ?? task.started_at ?? task.created_at
+  const timeTs = task.completed_at ?? task.activated_at ?? task.created_at
   const justDone = isJustCompleted(task)
 
   return (

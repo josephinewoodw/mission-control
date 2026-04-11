@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import type { AgentTask, AgentName } from '../types'
+import type { KanbanTask, AgentName } from '../types'
+
+// AgentTask is now an alias for KanbanTask (unified table)
+type AgentTask = KanbanTask
 
 const API_BASE = '/api'
 const POLL_INTERVAL_MS = 5_000

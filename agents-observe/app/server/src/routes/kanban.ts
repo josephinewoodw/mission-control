@@ -15,7 +15,7 @@ type Env = {
 
 const router = new Hono<Env>()
 
-const VALID_STATUSES: KanbanStatus[] = ['backlog', 'active', 'in_progress', 'done']
+const VALID_STATUSES: KanbanStatus[] = ['queued', 'active', 'in_progress', 'completed', 'failed', 'stale']
 const VALID_PRIORITIES: KanbanPriority[] = ['low', 'medium', 'high']
 
 // GET /kanban — list all tasks, grouped by status column
@@ -25,10 +25,12 @@ router.get('/kanban', async (c) => {
     const tasks = await store.getKanbanTasks()
     // Group by status for convenient frontend consumption
     const grouped = {
-      backlog: tasks.filter(t => t.status === 'backlog'),
+      queued: tasks.filter(t => t.status === 'queued'),
       active: tasks.filter(t => t.status === 'active'),
       in_progress: tasks.filter(t => t.status === 'in_progress'),
-      done: tasks.filter(t => t.status === 'done').slice(0, 10), // cap done at 10
+      completed: tasks.filter(t => t.status === 'completed').slice(0, 10), // cap completed at 10
+      failed: tasks.filter(t => t.status === 'failed'),
+      stale: tasks.filter(t => t.status === 'stale'),
     }
     return c.json({ tasks, grouped })
   } catch (err: any) {
@@ -62,7 +64,7 @@ router.post('/kanban', async (c) => {
       title,
       description: description ?? null,
       agentName: agent_name,
-      status: status ?? 'backlog',
+      status: status ?? 'queued',
       priority: priority ?? 'medium',
     })
 

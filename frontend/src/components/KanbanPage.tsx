@@ -12,27 +12,33 @@ import type { KanbanTask, KanbanStatus, KanbanPriority, AgentName } from '../typ
 
 const AGENT_NAMES: AgentName[] = ['fern', 'scout', 'reed', 'sentinel', 'timber', 'tide']
 
-const COLUMN_ORDER: KanbanStatus[] = ['backlog', 'in_progress', 'active', 'done']
+const COLUMN_ORDER: KanbanStatus[] = ['queued', 'in_progress', 'active', 'completed']
 
 const COLUMN_LABELS: Record<KanbanStatus, string> = {
-  backlog: 'Queued',
+  queued: 'Queued',
   active: 'Pending',
   in_progress: 'In Progress',
-  done: 'Completed',
+  completed: 'Completed',
+  failed: 'Failed',
+  stale: 'Stale',
 }
 
 const COLUMN_COLORS: Record<KanbanStatus, string> = {
-  backlog: 'text-gray-400',
+  queued: 'text-gray-400',
   active: 'text-fern',
   in_progress: 'text-working',
-  done: 'text-gray-500',
+  completed: 'text-gray-500',
+  failed: 'text-blocked',
+  stale: 'text-gray-600',
 }
 
 const COLUMN_BORDER_ACTIVE: Record<KanbanStatus, string> = {
-  backlog: 'border-gray-600',
+  queued: 'border-gray-600',
   active: 'border-fern/60',
   in_progress: 'border-working/60',
-  done: 'border-gray-600',
+  completed: 'border-gray-600',
+  failed: 'border-blocked/60',
+  stale: 'border-gray-700',
 }
 
 const AGENT_COLORS: Record<string, string> = {
@@ -85,7 +91,10 @@ interface TaskCardProps {
 function TaskCard({ task, onDragStart, onEdit }: TaskCardProps) {
   const isActive = task.status === 'active'
   const isInProgress = task.status === 'in_progress'
-  const isDone = task.status === 'done'
+  const isCompleted = task.status === 'completed'
+  const isFailed = task.status === 'failed'
+  const isStale = task.status === 'stale'
+  const isDimmed = isCompleted || isStale
 
   return (
     <div
@@ -97,17 +106,18 @@ function TaskCard({ task, onDragStart, onEdit }: TaskCardProps) {
         transition-all hover:border-opacity-60 hover:shadow-sm
         ${isActive ? 'border-fern/40 bg-fern/5 shadow-[0_0_8px_rgba(168,216,168,0.06)]' :
           isInProgress ? 'border-working/40 bg-working/5' :
-          isDone ? 'border-border/40 bg-transparent opacity-50' :
+          isFailed ? 'border-blocked/40 bg-blocked/5' :
+          isDimmed ? 'border-border/40 bg-transparent opacity-50' :
           'border-border bg-bg-dark/50'}
       `}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className={`text-xs font-medium leading-snug flex-1 ${isDone ? 'line-through text-gray-500' : 'text-gray-200'}`}>
+        <span className={`text-xs font-medium leading-snug flex-1 ${isDimmed ? 'line-through text-gray-500' : isFailed ? 'text-blocked' : 'text-gray-200'}`}>
           {task.title}
         </span>
       </div>
 
-      {task.description && !isDone && (
+      {task.description && !isDimmed && (
         <p className="text-[0.62rem] text-gray-500 mb-2 line-clamp-2 leading-relaxed">
           {task.description}
         </p>
@@ -141,7 +151,7 @@ function TaskModal({ task, onSave, onDelete, onClose, isNew = false }: TaskModal
   const [title, setTitle] = useState(task?.title ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
   const [agentName, setAgentName] = useState(task?.agent_name ?? 'fern')
-  const [status, setStatus] = useState<KanbanStatus>(task?.status ?? 'backlog')
+  const [status, setStatus] = useState<KanbanStatus>(task?.status ?? 'queued')
   const [priority, setPriority] = useState<KanbanPriority>(task?.priority ?? 'medium')
 
   function handleSubmit(e: React.FormEvent) {
@@ -246,10 +256,12 @@ function TaskModal({ task, onSave, onDelete, onClose, isNew = false }: TaskModal
                 onChange={e => setStatus(e.target.value as KanbanStatus)}
                 className="w-full px-3 py-2 bg-bg-dark border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:border-fern/50"
               >
-                <option value="backlog">Queued</option>
+                <option value="queued">Queued</option>
                 <option value="in_progress">In Progress</option>
                 <option value="active">Pending (needs help)</option>
-                <option value="done">Completed</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+                <option value="stale">Stale</option>
               </select>
             </div>
           )}
@@ -341,7 +353,7 @@ function KanbanColumn({
       <div className="flex-1 overflow-y-auto feed-scroll p-3 space-y-2 min-h-[60px]">
         {filtered.length === 0 && (
           <div className={`text-[0.65rem] text-gray-600 italic text-center py-4 ${isDragOver ? 'text-gray-500' : ''}`}>
-            {isDragOver ? 'Release to drop' : status === 'done' ? 'Nothing completed yet' : status === 'backlog' ? 'No queued tasks' : 'No tasks'}
+            {isDragOver ? 'Release to drop' : status === 'completed' ? 'Nothing completed yet' : status === 'queued' ? 'No queued tasks' : status === 'failed' ? 'No failures' : status === 'stale' ? 'No stale tasks' : 'No tasks'}
           </div>
         )}
         {filtered.map(task => (

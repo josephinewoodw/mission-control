@@ -112,20 +112,65 @@ export class SqliteAdapter implements EventStore {
       // Column already exists — ignore
     }
 
-    // Kanban tasks — persistent strategic backlog, separate from live agent_tasks
+    // Unified task table — replaces both kanban_tasks and agent_tasks
+    // Statuses: queued, in_progress, active, completed, failed, stale
+    // Priority: low, medium, high (text)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS kanban_tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         description TEXT,
         agent_name TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'backlog',
+        status TEXT NOT NULL DEFAULT 'queued',
         priority TEXT NOT NULL DEFAULT 'medium',
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         activated_at INTEGER,
-        completed_at INTEGER
+        completed_at INTEGER,
+        tool_use_id TEXT,
+        session_id TEXT
       )
+    `)
+
+    // Add new columns to kanban_tasks if they don't exist (migration for existing DBs)
+    try { this.db.exec(`ALTER TABLE kanban_tasks ADD COLUMN tool_use_id TEXT`) } catch { /* exists */ }
+    try { this.db.exec(`ALTER TABLE kanban_tasks ADD COLUMN session_id TEXT`) } catch { /* exists */ }
+
+    // Migrate status names: backlog→queued, done→completed
+    this.db.exec(`UPDATE kanban_tasks SET status = 'queued' WHERE status = 'backlog'`)
+    this.db.exec(`UPDATE kanban_tasks SET status = 'completed' WHERE status = 'done'`)
+
+    // Normalize numeric-looking priority values to text
+    this.db.exec(`UPDATE kanban_tasks SET priority = 'medium' WHERE priority NOT IN ('low', 'medium', 'high')`)
+
+    // Migrate useful agent_tasks (non-stale queued tasks with no session) into kanban_tasks
+    // Only migrate if they don't already exist by title+agent_name combo
+    this.db.exec(`
+      INSERT OR IGNORE INTO kanban_tasks (title, description, agent_name, status, priority, created_at, updated_at, tool_use_id, session_id)
+      SELECT
+        title,
+        description,
+        agent_name,
+        CASE status
+          WHEN 'queued' THEN 'queued'
+          WHEN 'in_progress' THEN 'in_progress'
+          WHEN 'completed' THEN 'completed'
+          WHEN 'failed' THEN 'failed'
+          ELSE 'stale'
+        END as status,
+        CASE priority
+          WHEN 1 THEN 'high'
+          WHEN 0 THEN 'medium'
+          ELSE 'medium'
+        END as priority,
+        created_at,
+        COALESCE(completed_at, created_at) as updated_at,
+        tool_use_id,
+        session_id
+      FROM agent_tasks
+      WHERE status IN ('queued')
+        AND session_id IS NULL
+        AND title NOT IN (SELECT title FROM kanban_tasks WHERE agent_name = agent_tasks.agent_name)
     `)
 
     // Create indexes
@@ -557,39 +602,65 @@ export class SqliteAdapter implements EventStore {
       .all(...sessionIds)
   }
 
+  /** Normalize numeric priority to text for backward compat with hooks that send 0/1 */
+  private normalizePriority(priority: number | string | null | undefined): string {
+    if (priority === null || priority === undefined) return 'medium'
+    if (typeof priority === 'string') {
+      if (['low', 'medium', 'high'].includes(priority)) return priority
+      // Try to parse as number
+      const n = parseFloat(priority)
+      if (!isNaN(n)) return n >= 1 ? 'high' : 'medium'
+      return 'medium'
+    }
+    // Numeric: 0=medium, 1=high, anything else=low
+    if (priority >= 1) return 'high'
+    return 'medium'
+  }
+
+  // =========================================================
+  // Unified task API — reads/writes kanban_tasks
+  // =========================================================
+
   async createTask(params: {
     agentName: string
     title: string
     description?: string | null
-    priority?: number
+    priority?: number | string
     toolUseId?: string | null
     sessionId?: string | null
   }): Promise<number> {
     const now = Date.now()
+    const priority = this.normalizePriority(params.priority)
     const result = this.db
       .prepare(
-        `INSERT INTO agent_tasks (agent_name, title, description, status, priority, created_at, tool_use_id, session_id)
-         VALUES (?, ?, ?, 'queued', ?, ?, ?, ?)`,
+        `INSERT INTO kanban_tasks (title, description, agent_name, status, priority, created_at, updated_at, tool_use_id, session_id)
+         VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?)`,
       )
-      .run(params.agentName, params.title, params.description ?? null, params.priority ?? 0, now, params.toolUseId ?? null, params.sessionId ?? null)
+      .run(params.title, params.description ?? null, params.agentName, priority, now, now, params.toolUseId ?? null, params.sessionId ?? null)
     return result.lastInsertRowid as number
   }
 
   async getTasksForAgent(agentName: string, limit: number = 20): Promise<any[]> {
     return this.db
       .prepare(
-        `SELECT * FROM agent_tasks
+        `SELECT * FROM kanban_tasks
          WHERE agent_name = ?
          ORDER BY
            CASE status
              WHEN 'in_progress' THEN 0
              WHEN 'queued' THEN 1
-             WHEN 'completed' THEN 2
-             WHEN 'failed' THEN 3
-             WHEN 'stale' THEN 4
-             ELSE 5
+             WHEN 'active' THEN 2
+             WHEN 'completed' THEN 3
+             WHEN 'failed' THEN 4
+             WHEN 'stale' THEN 5
+             ELSE 6
            END,
-           priority DESC,
+           CASE priority
+             WHEN 'high' THEN 0
+             WHEN 'medium' THEN 1
+             WHEN 'low' THEN 2
+             ELSE 3
+           END,
            created_at DESC
          LIMIT ?`,
       )
@@ -599,42 +670,44 @@ export class SqliteAdapter implements EventStore {
   async getAllTasks(limit: number = 50): Promise<any[]> {
     return this.db
       .prepare(
-        `SELECT * FROM agent_tasks
+        `SELECT * FROM kanban_tasks
          ORDER BY
            CASE status
              WHEN 'in_progress' THEN 0
              WHEN 'queued' THEN 1
-             WHEN 'completed' THEN 2
-             WHEN 'failed' THEN 3
-             WHEN 'stale' THEN 4
-             ELSE 5
+             WHEN 'active' THEN 2
+             WHEN 'completed' THEN 3
+             WHEN 'failed' THEN 4
+             WHEN 'stale' THEN 5
+             ELSE 6
            END,
-           priority DESC,
+           CASE priority
+             WHEN 'high' THEN 0
+             WHEN 'medium' THEN 1
+             WHEN 'low' THEN 2
+             ELSE 3
+           END,
            created_at DESC
          LIMIT ?`,
       )
       .all(limit)
   }
 
-  async updateTaskStatus(
-    id: number,
-    status: 'queued' | 'in_progress' | 'active' | 'completed' | 'failed' | 'stale',
-  ): Promise<void> {
+  async updateTaskStatus(id: number, status: KanbanStatus): Promise<void> {
     const now = Date.now()
-    const startedAt = status === 'in_progress' ? now : null
-    const completedAt = status === 'completed' || status === 'failed' ? now : null
+    const fields: string[] = ['status = ?', 'updated_at = ?']
+    const values: any[] = [status, now]
 
     if (status === 'in_progress') {
-      this.db
-        .prepare(`UPDATE agent_tasks SET status = ?, started_at = ? WHERE id = ?`)
-        .run(status, startedAt, id)
-    } else if (status === 'completed' || status === 'failed') {
-      this.db
-        .prepare(`UPDATE agent_tasks SET status = ?, completed_at = ? WHERE id = ?`)
-        .run(status, completedAt, id)
-    } else {
-      this.db.prepare(`UPDATE agent_tasks SET status = ? WHERE id = ?`).run(status, id)
+      fields.push('activated_at = COALESCE(activated_at, ?)')
+      values.push(now)
+    } else if (status === 'completed' || status === 'failed' || status === 'stale') {
+      fields.push('completed_at = ?')
+      values.push(now)
     }
+
+    values.push(id)
+    this.db.prepare(`UPDATE kanban_tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values)
   }
 
   async updateTaskByToolUseId(
@@ -644,34 +717,34 @@ export class SqliteAdapter implements EventStore {
     const now = Date.now()
     if (status === 'in_progress') {
       this.db
-        .prepare(`UPDATE agent_tasks SET status = ?, started_at = ? WHERE tool_use_id = ? AND status = 'queued'`)
-        .run(status, now, toolUseId)
+        .prepare(`UPDATE kanban_tasks SET status = ?, activated_at = COALESCE(activated_at, ?), updated_at = ? WHERE tool_use_id = ? AND status = 'queued'`)
+        .run(status, now, now, toolUseId)
     } else {
       this.db
-        .prepare(`UPDATE agent_tasks SET status = ?, completed_at = ? WHERE tool_use_id = ?`)
-        .run(status, now, toolUseId)
+        .prepare(`UPDATE kanban_tasks SET status = ?, completed_at = ?, updated_at = ? WHERE tool_use_id = ?`)
+        .run(status, now, now, toolUseId)
     }
   }
 
   async getTaskById(id: number): Promise<any | null> {
-    return this.db.prepare(`SELECT * FROM agent_tasks WHERE id = ?`).get(id) || null
+    return this.db.prepare(`SELECT * FROM kanban_tasks WHERE id = ?`).get(id) || null
   }
 
   /**
    * Mark active/queued tasks as stale. Called on server cold startup (no session yet)
    * to clean up tasks left open when the previous session crashed or was killed.
-   * Tasks with no session_id are API-created (not tied to a Claude session) and are
+   * Tasks with no session_id are manually-created (persistent backlog) and are
    * preserved — they should not be staled on startup.
    * Returns the number of tasks marked stale.
    */
   async markStaleTasksOnStartup(): Promise<number> {
     const result = this.db
       .prepare(
-        `UPDATE agent_tasks SET status = 'stale', completed_at = ?
+        `UPDATE kanban_tasks SET status = 'stale', completed_at = ?, updated_at = ?
          WHERE status IN ('in_progress', 'queued')
            AND session_id IS NOT NULL`,
       )
-      .run(Date.now())
+      .run(Date.now(), Date.now())
     const count = result.changes
     if (count > 0) {
       console.log(`[startup] Marked ${count} stale task(s) from previous sessions`)
@@ -683,19 +756,18 @@ export class SqliteAdapter implements EventStore {
    * Mark active/queued tasks from PREVIOUS sessions as stale. Called when a new
    * Claude session starts (SessionStart event) while the server is already running.
    * Tasks belonging to the current session are preserved.
-   * Tasks with no session_id are API-created (not tied to any session) and are
-   * preserved — they represent manually managed tasks and should not auto-stale.
+   * Tasks with no session_id are persistent backlog tasks and should not auto-stale.
    * Returns the number of tasks marked stale.
    */
   async markStaleTasksForNewSession(currentSessionId: string): Promise<number> {
     const result = this.db
       .prepare(
-        `UPDATE agent_tasks SET status = 'stale', completed_at = ?
+        `UPDATE kanban_tasks SET status = 'stale', completed_at = ?, updated_at = ?
          WHERE status IN ('in_progress', 'queued')
            AND session_id IS NOT NULL
            AND session_id != ?`,
       )
-      .run(Date.now(), currentSessionId)
+      .run(Date.now(), Date.now(), currentSessionId)
     const count = result.changes
     if (count > 0) {
       console.log(`[session] Marked ${count} stale task(s) from previous sessions (new session: ${currentSessionId})`)
@@ -746,7 +818,7 @@ export class SqliteAdapter implements EventStore {
         params.title,
         params.description ?? null,
         params.agentName,
-        params.status ?? 'backlog',
+        params.status ?? 'queued',
         params.priority ?? 'medium',
         now,
         now,
@@ -762,9 +834,11 @@ export class SqliteAdapter implements EventStore {
            CASE status
              WHEN 'active' THEN 0
              WHEN 'in_progress' THEN 1
-             WHEN 'backlog' THEN 2
-             WHEN 'done' THEN 3
-             ELSE 4
+             WHEN 'queued' THEN 2
+             WHEN 'completed' THEN 3
+             WHEN 'failed' THEN 4
+             WHEN 'stale' THEN 5
+             ELSE 6
            END,
            CASE priority
              WHEN 'high' THEN 0
@@ -802,13 +876,13 @@ export class SqliteAdapter implements EventStore {
     if (updates.status !== undefined) {
       fields.push('status = ?')
       values.push(updates.status)
-      // Set activated_at when moved to active
-      if (updates.status === 'active') {
-        fields.push('activated_at = ?')
+      // Set activated_at when moved to active or in_progress
+      if (updates.status === 'active' || updates.status === 'in_progress') {
+        fields.push('activated_at = COALESCE(activated_at, ?)')
         values.push(now)
       }
-      // Set completed_at when moved to done
-      if (updates.status === 'done') {
+      // Set completed_at when moved to completed/failed/stale
+      if (updates.status === 'completed' || updates.status === 'failed' || updates.status === 'stale') {
         fields.push('completed_at = ?')
         values.push(now)
       }
@@ -844,8 +918,8 @@ export class SqliteAdapter implements EventStore {
     const now = Date.now()
     this.db
       .prepare(
-        `UPDATE kanban_tasks SET status = 'in_progress', updated_at = ? WHERE id = ? AND status = 'active'`,
+        `UPDATE kanban_tasks SET status = 'in_progress', activated_at = COALESCE(activated_at, ?), updated_at = ? WHERE id = ? AND status = 'active'`,
       )
-      .run(now, id)
+      .run(now, now, id)
   }
 }

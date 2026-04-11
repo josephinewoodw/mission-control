@@ -73,8 +73,9 @@ router.patch('/tasks/:id', async (c) => {
     const body = await c.req.json()
     const { status } = body
 
-    if (!['queued', 'in_progress', 'active', 'completed', 'failed', 'stale'].includes(status)) {
-      return c.json({ error: 'status must be queued | in_progress | active | completed | failed | stale' }, 400)
+    const validStatuses = ['queued', 'in_progress', 'active', 'completed', 'failed', 'stale']
+    if (!validStatuses.includes(status)) {
+      return c.json({ error: `status must be one of: ${validStatuses.join(' | ')}` }, 400)
     }
 
     await store.updateTaskStatus(id, status)

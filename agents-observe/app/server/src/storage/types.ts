@@ -90,18 +90,18 @@ export interface EventStore {
   getUsageForSessions(sessionIds: string[]): Promise<any[]>
   healthCheck(): Promise<{ ok: boolean; error?: string }>
 
-  // Agent tasks
+  // Unified task API (backed by kanban_tasks table)
   createTask(params: {
     agentName: string
     title: string
     description?: string | null
-    priority?: number
+    priority?: number | KanbanPriority
     toolUseId?: string | null
     sessionId?: string | null
   }): Promise<number>
   getTasksForAgent(agentName: string, limit?: number): Promise<any[]>
   getAllTasks(limit?: number): Promise<any[]>
-  updateTaskStatus(id: number, status: 'queued' | 'in_progress' | 'active' | 'completed' | 'failed' | 'stale'): Promise<void>
+  updateTaskStatus(id: number, status: KanbanStatus): Promise<void>
   updateTaskByToolUseId(toolUseId: string, status: 'in_progress' | 'completed' | 'failed'): Promise<void>
   getTaskById(id: number): Promise<any | null>
   /** Mark all active/queued tasks as stale — called on server cold startup to clear leftover tasks from crashed sessions */
@@ -109,7 +109,7 @@ export interface EventStore {
   /** Mark active/queued tasks from previous sessions as stale — called on SessionStart with the new session ID */
   markStaleTasksForNewSession(currentSessionId: string): Promise<number>
 
-  // Kanban tasks (persistent strategic backlog — separate from live agent_tasks)
+  // Kanban tasks (same table — unified API)
   createKanbanTask(params: {
     title: string
     description?: string | null
@@ -131,7 +131,7 @@ export interface EventStore {
   claimKanbanTask(id: number): Promise<void>
 }
 
-export type KanbanStatus = 'backlog' | 'active' | 'in_progress' | 'done'
+export type KanbanStatus = 'queued' | 'active' | 'in_progress' | 'completed' | 'failed' | 'stale'
 export type KanbanPriority = 'low' | 'medium' | 'high'
 
 export interface KanbanTask {
