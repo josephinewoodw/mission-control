@@ -344,7 +344,28 @@ export function AnalyticsPage({ onBack }: AnalyticsPageProps) {
             </div>
           )}
 
-          {/* Section 2: Recent content performance */}
+          {/* Section 2: Follower Trend + Forecast side by side */}
+          {data && (
+            <div className="grid grid-cols-2 gap-4">
+              <Section title="Follower Trends" className="min-w-0">
+                <FollowerChart
+                  snapshots={data.followerSnapshots}
+                  stats={data.followerStats}
+                  posts={data.posts}
+                  compact
+                />
+              </Section>
+              <Section title="Follower Forecast" className="min-w-0">
+                <FollowerForecast
+                  forecast={data.forecast}
+                  snapshots={data.followerSnapshots}
+                  currentFollowers={data.followerStats.current}
+                />
+              </Section>
+            </div>
+          )}
+
+          {/* Section 3: Recent content performance */}
           <Section title="Recent Content Performance">
             {/* Search bar */}
             <div className="mb-4">
@@ -367,7 +388,7 @@ export function AnalyticsPage({ onBack }: AnalyticsPageProps) {
             )}
           </Section>
 
-          {/* Section 3: Category breakdown */}
+          {/* Section 4: Category breakdown */}
           <Section title="Category Performance">
             {data && (
               <CategoryCards
@@ -378,35 +399,13 @@ export function AnalyticsPage({ onBack }: AnalyticsPageProps) {
             )}
           </Section>
 
-          {/* Section 4: Hook analysis */}
+          {/* Section 5: Hook analysis */}
           <Section title="Hook Analysis">
             {data && (
               <HookAnalysis
                 posts={filteredPosts}
                 hookStats={data.hookStats}
                 dateFilter={dateRange}
-              />
-            )}
-          </Section>
-
-          {/* Section 5: Follower trends */}
-          <Section title="Follower Trends">
-            {data && (
-              <FollowerChart
-                snapshots={data.followerSnapshots}
-                stats={data.followerStats}
-                posts={data.posts}
-              />
-            )}
-          </Section>
-
-          {/* Section 6: Follower forecast */}
-          <Section title="Follower Forecast">
-            {data && (
-              <FollowerForecast
-                forecast={data.forecast}
-                snapshots={data.followerSnapshots}
-                currentFollowers={data.followerStats.current}
               />
             )}
           </Section>
