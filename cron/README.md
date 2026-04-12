@@ -14,20 +14,28 @@ Fern's session no longer manages cron jobs. Each job is a self-contained launchd
 3. Invokes `claude --print --model sonnet --dangerously-skip-permissions` with the agent prompt
 4. Appends stdout + stderr to a log file in `~/Library/Logs/mission-control/`
 
+## ⚠️ CRITICAL: launchd uses LOCAL time, not UTC
+
+`StartCalendarInterval` in every plist is interpreted in the **system's local timezone**, not UTC. The `<Hour>` value is the local hour the job fires — NOT the UTC hour.
+
+A previous bug had all 7 plists encoded as if `Hour` were UTC, which made every job fire 5 hours late (e.g., the 6:57am brief was firing at 11:57am). Fixed 2026-04-12 by rewriting every plist to local hours. **Don't reintroduce this.** If you want 6:57am CT, write `<Hour>6</Hour><Minute>57</Minute>`. Do not "convert to UTC."
+
+On DST transitions the plists keep the same local hour — no edit needed.
+
 ## Jobs
 
-| Job | Agent | Schedule (CT) | Schedule (UTC) | Cron |
-|-----|-------|--------------|----------------|------|
-| scout-daily-brief | Scout | 6:57am daily | 11:57 daily | `57 11 * * *` |
-| sentinel-context-collection | Sentinel | Every 3h at :17 | Every 3h at :17 | `17 */3 * * *` |
-| sentinel-health-check-morning | Sentinel | 6:00am daily | 11:00 daily | `0 11 * * *` |
-| sentinel-health-check-evening | Sentinel | 10:00pm daily | 03:00 daily | `0 3 * * *` |
-| sentinel-nightly-security-scan | Sentinel | 11:00pm daily | 04:00 daily | `0 4 * * *` |
-| reed-weekly-content | Reed | Thu 9:00am | Thu 14:00 | `0 14 * * 4` |
-| scout-weekly-content-review | Scout | Fri 5:00pm | Fri 22:00 | `0 22 * * 5` |
-| scout-derek-job-scan | Scout | Wed 8:00am | Wed 13:00 | `0 13 * * 3` |
+Plist Hour/Minute values below are **local time** — what launchd actually reads.
 
-Note: launchd uses local system time, not UTC. The UTC times above are for reference assuming CT (UTC-5 standard / UTC-6 daylight). **Adjust the plist Hour values if your system timezone differs from CT.**
+| Job | Agent | Local time | Plist Hour / Minute | Weekday |
+|-----|-------|-----------|----------------------|---------|
+| scout-daily-brief | Scout | 6:57am daily | 6 / 57 | any |
+| sentinel-context-collection | Sentinel | Every 3h at :17 | `StartInterval` 10800s | n/a |
+| sentinel-health-check-morning | Sentinel | 6:00am daily | 6 / 0 | any |
+| sentinel-health-check-evening | Sentinel | 10:00pm daily | 22 / 0 | any |
+| sentinel-nightly-security-scan | Sentinel | 11:00pm daily | 23 / 0 | any |
+| reed-weekly-content | Reed | Thu 9:00am | 9 / 0 | 4 (Thu) |
+| scout-weekly-content-review | Scout | Fri 5:00pm | 17 / 0 | 5 (Fri) |
+| scout-derek-job-scan | Scout | Wed 8:00am | 8 / 0 | 3 (Wed) |
 
 ## Installation
 

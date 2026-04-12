@@ -1,62 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!--
-  Mission Control — Scout Weekly Content Review
-
-  Schedule: Friday 5:00pm CT (22:00 UTC, Weekday=5)
-  Cron equivalent: 0 22 * * 5
-
-  Installation: run cron/install.sh — or manually:
-    ln -sf "$(pwd)/plists/com.mission-control.scout-weekly-content-review.plist" ~/Library/LaunchAgents/
-    launchctl load ~/Library/LaunchAgents/com.mission-control.scout-weekly-content-review.plist
-
-  Logs: ~/Library/Logs/mission-control/scout-weekly-content-review.log
--->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key>
-  <string>com.mission-control.scout-weekly-content-review</string>
-
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/bash</string>
-    <string>/Users/josephinewood/mission-control/cron/scripts/scout-weekly-content-review.sh</string>
-  </array>
-
-  <key>WorkingDirectory</key>
-  <string>/Users/josephinewood/fern-vault</string>
-
-  <!-- Friday 5:00pm CT = Friday 22:00 UTC (Weekday 5 = Friday) -->
-  <key>StartCalendarInterval</key>
-  <dict>
-    <key>Weekday</key>
-    <integer>5</integer>
-    <key>Hour</key>
-    <integer>22</integer>
-    <key>Minute</key>
-    <integer>0</integer>
-  </dict>
-
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>HOME</key>
-    <string>/Users/josephinewood</string>
-    <key>PATH</key>
-    <string>/Users/josephinewood/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
-    <key>VAULT_DIR</key>
-    <string>/Users/josephinewood/fern-vault</string>
-    <key>CLAUDE_MODEL</key>
-    <string>sonnet</string>
-  </dict>
-
-  <key>ThrottleInterval</key>
-  <integer>60</integer>
-
-  <key>StandardOutPath</key>
-  <string>/Users/josephinewood/Library/Logs/mission-control/scout-weekly-content-review.log</string>
-
-  <key>StandardErrorPath</key>
-  <string>/Users/josephinewood/Library/Logs/mission-control/scout-weekly-content-review.log</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>CLAUDE_MODEL</key>
+		<string>sonnet</string>
+		<key>HOME</key>
+		<string>/Users/josephinewood</string>
+		<key>PATH</key>
+		<string>/Users/josephinewood/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>VAULT_DIR</key>
+		<string>/Users/josephinewood/fern-vault</string>
+	</dict>
+	<key>Label</key>
+	<string>com.mission-control.scout-weekly-content-review</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/Users/josephinewood/mission-control/cron/scripts/scout-weekly-content-review.sh</string>
+	</array>
+	<key>StandardErrorPath</key>
+	<string>/Users/josephinewood/Library/Logs/mission-control/scout-weekly-content-review.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/josephinewood/Library/Logs/mission-control/scout-weekly-content-review.log</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>17</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+		<key>Weekday</key>
+		<integer>5</integer>
+	</dict>
+	<key>ThrottleInterval</key>
+	<integer>60</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/josephinewood/fern-vault</string>
 </dict>
 </plist>
