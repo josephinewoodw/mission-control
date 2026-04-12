@@ -88,6 +88,20 @@ router.get('/kanban/pending', async (c) => {
   }
 })
 
+// GET /kanban/pending-dispatch — queued tasks created via the UI that Fern hasn't dispatched yet.
+// These are tasks with no tool_use_id or session_id (i.e. not created by an agent hook).
+// Fern polls this endpoint to detect new UI-created tasks and dispatch them to the correct agent.
+// After picking up a task, Fern should PATCH it to status=active (or in_progress) to prevent double-dispatch.
+router.get('/kanban/pending-dispatch', async (c) => {
+  const store = c.get('store')
+  try {
+    const tasks = await store.getPendingDispatchTasks()
+    return c.json(tasks)
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Failed to fetch pending dispatch tasks' }, 500)
+  }
+})
+
 // PATCH /kanban/:id — update a task (title, description, agent_name, status, priority)
 router.patch('/kanban/:id', async (c) => {
   const store = c.get('store')

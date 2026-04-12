@@ -129,6 +129,7 @@ export interface EventStore {
   deleteKanbanTask(id: number): Promise<void>
   getPendingKanbanTasks(): Promise<KanbanTask[]>
   claimKanbanTask(id: number): Promise<void>
+  getPendingDispatchTasks(): Promise<KanbanTask[]>
 }
 
 export type KanbanStatus = 'queued' | 'active' | 'in_progress' | 'completed' | 'failed' | 'stale'
@@ -145,4 +146,6 @@ export interface KanbanTask {
   updated_at: number
   activated_at: number | null
   completed_at: number | null
+  tool_use_id: string | null
+  session_id: string | null
 }

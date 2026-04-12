@@ -922,4 +922,25 @@ export class SqliteAdapter implements EventStore {
       )
       .run(now, now, id)
   }
+
+  async getPendingDispatchTasks(): Promise<KanbanTask[]> {
+    // Returns queued tasks created via the UI (tool_use_id IS NULL and session_id IS NULL),
+    // meaning Fern hasn't seen them yet. Fern polls this to dispatch newly created tasks.
+    return this.db
+      .prepare(
+        `SELECT * FROM kanban_tasks
+         WHERE status = 'queued'
+           AND tool_use_id IS NULL
+           AND session_id IS NULL
+         ORDER BY
+           CASE priority
+             WHEN 'high' THEN 0
+             WHEN 'medium' THEN 1
+             WHEN 'low' THEN 2
+             ELSE 3
+           END,
+           created_at ASC`,
+      )
+      .all() as KanbanTask[]
+  }
 }
