@@ -138,12 +138,14 @@ function Section({ title, children, className = '' }: {
 
 // ─── Account header bar ───────────────────────────────────────────────────────
 
-function AccountHeader({ account, connected, lastUpdated, backfillDone, onBackfill }: {
+function AccountHeader({ account, connected, lastUpdated, backfillDone, onBackfill, backfilling, backfillResult }: {
   account: any
   connected: boolean
   lastUpdated: string | null
   backfillDone: boolean
   onBackfill: () => void
+  backfilling: boolean
+  backfillResult: 'success' | 'error' | null
 }) {
   const followersNow = account?.followers_count || 0
   // 24h delta isn't tracked precisely yet — show placeholder
@@ -194,9 +196,16 @@ function AccountHeader({ account, connected, lastUpdated, backfillDone, onBackfi
 
           <button
             onClick={onBackfill}
-            className="px-3 py-1.5 text-xs rounded-lg bg-bg-dark border border-border text-gray-400 hover:text-gray-200 hover:border-fern/30 transition-colors"
+            disabled={backfilling}
+            className={`px-3 py-1.5 text-xs rounded-lg bg-bg-dark border transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+              backfillResult === 'success'
+                ? 'border-fern/50 text-fern'
+                : backfillResult === 'error'
+                ? 'border-blocked/50 text-blocked'
+                : 'border-border text-gray-400 hover:text-gray-200 hover:border-fern/30'
+            }`}
           >
-            Force sync
+            {backfilling ? 'Syncing...' : backfillResult === 'success' ? 'Sync started' : backfillResult === 'error' ? 'Sync failed' : 'Force sync'}
           </button>
         </div>
       </div>
@@ -211,7 +220,7 @@ interface AnalyticsPageProps {
 }
 
 export function AnalyticsPage({ onBack }: AnalyticsPageProps) {
-  const { data, loading, error, connected, updatePostCategory, triggerBackfill } = useAnalyticsData()
+  const { data, loading, error, connected, backfilling, backfillResult, updatePostCategory, triggerBackfill } = useAnalyticsData()
 
   const [datePreset, setDatePreset] = useState<DatePreset>('all')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
@@ -314,6 +323,8 @@ export function AnalyticsPage({ onBack }: AnalyticsPageProps) {
             lastUpdated={data?.lastUpdated || null}
             backfillDone={data?.backfillDone || false}
             onBackfill={triggerBackfill}
+            backfilling={backfilling}
+            backfillResult={backfillResult}
           />
 
           {/* Global category filter chips */}

@@ -132,6 +132,8 @@ interface UseAnalyticsDataReturn {
   loading: boolean
   error: string | null
   connected: boolean
+  backfilling: boolean
+  backfillResult: 'success' | 'error' | null
   updatePostCategory: (postId: string, category: string) => Promise<boolean>
   triggerBackfill: () => Promise<void>
   refetch: () => void
@@ -142,6 +144,8 @@ export function useAnalyticsData(): UseAnalyticsDataReturn {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [connected, setConnected] = useState(false)
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillResult, setBackfillResult] = useState<'success' | 'error' | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval>>(undefined)
   const cancelledRef = useRef(false)
 
@@ -199,15 +203,30 @@ export function useAnalyticsData(): UseAnalyticsDataReturn {
   }, [])
 
   const triggerBackfill = useCallback(async () => {
-    await fetch(`${ANALYTICS_BASE}/analytics/backfill`, { method: 'POST' })
-    setTimeout(fetchData, 3000) // Re-fetch after 3s
-  }, [fetchData])
+    if (backfilling) return
+    setBackfilling(true)
+    setBackfillResult(null)
+    try {
+      const res = await fetch(`${ANALYTICS_BASE}/analytics/backfill`, { method: 'POST' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setBackfillResult('success')
+      setTimeout(fetchData, 3000) // Re-fetch after 3s
+    } catch {
+      setBackfillResult('error')
+    } finally {
+      setBackfilling(false)
+      // Clear the result indicator after 3s
+      setTimeout(() => setBackfillResult(null), 3000)
+    }
+  }, [fetchData, backfilling])
 
   return {
     data,
     loading,
     error,
     connected,
+    backfilling,
+    backfillResult,
     updatePostCategory,
     triggerBackfill,
     refetch: fetchData,
