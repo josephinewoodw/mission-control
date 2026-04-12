@@ -29,12 +29,23 @@ function drawElizaFloorTile(
 
   if (tileType === 2) {
     // Tile floor (break room) — use Tile B tileset
+    // LDtk Tile_Floor layer data:
+    //   Row 4 strip (cols 30-37): src(112,112) — tile at col 7, row 7
+    //   Rows 6-15 break room (cols 28-39): src(96,0) — tile at col 6, row 0
     const tileImg = getTileImage(ELIZA_TILE_FLOOR_PATH)
     if (tileImg) {
-      // Tile B is 128x128, 8x8 grid of 16px tiles — use a natural pattern
-      const srcCol = ((tx * 3 + ty * 7) % 5)
-      const srcRow = 4 + ((tx + ty * 2) % 3)
-      ctx.drawImage(tileImg, srcCol * 16, srcRow * 16, 16, 16, x, y, TILE, TILE)
+      let srcX: number
+      let srcY: number
+      if (ty === 4) {
+        // Row 4 strip uses a different tile variant
+        srcX = 112
+        srcY = 112
+      } else {
+        // Standard break room tile
+        srcX = 96
+        srcY = 0
+      }
+      ctx.drawImage(tileImg, srcX, srcY, 16, 16, x, y, TILE, TILE)
       return
     }
     // Fallback
@@ -43,11 +54,11 @@ function drawElizaFloorTile(
     return
   }
 
-  // Wood floor — use Wood Floor A tileset
-  // The tileset has multiple wood plank variants to create visual variety
-  // Use columns 0-3 (natural wood grain rows) cycling through patterns
-  const srcCol = ((tx * 2 + ty) % 5)
-  const srcRow = 2 + ((tx + ty * 3) % 4)
+  // Wood floor — use Wood Floor A tileset (160x192px, 10x12 grid at 16px)
+  // LDtk Floor layer data: 8 unique tile types at src(0,32),(0,48),(0,64),(0,80),(16,32),(16,48),(16,64),(16,80)
+  // That's 2 columns (x=0,16) × 4 rows (y=32,48,64,80) = rows 2-5 of the tileset
+  const srcCol = (tx + ty) % 2             // alternates 0 or 1 → x = 0 or 16
+  const srcRow = 2 + ((tx * 2 + ty) % 4)  // rows 2-5 → y = 32,48,64,80
   ctx.drawImage(img, srcCol * 16, srcRow * 16, 16, 16, x, y, TILE, TILE)
 }
 
@@ -83,7 +94,12 @@ function drawFloor(ctx: CanvasRenderingContext2D) {
 /**
  * Draw walls using Eliza Brick Wall A tileset.
  * The tileset is 192x288px, 12x18 grid of 16px tiles.
- * We sample rows 12-17 (cols 8-9) which appear to be standard brick wall tiles.
+ *
+ * Source rects from LDtk Walls layer:
+ *   Top wall (rows 0-5): srcX alternates 128/144 by column, srcY = row*16 + 192
+ *     Row 0: srcY=192, Row 1: srcY=208, ..., Row 5: srcY=272
+ *   Row 6 break room back wall (cols 28-34): srcX=128/144, srcY=272 (bottom wall row)
+ *   Center divider (cols 26-27): same as outer wall for visual consistency
  */
 function drawWalls(ctx: CanvasRenderingContext2D) {
   const layout = getLayoutMap()
@@ -102,10 +118,13 @@ function drawWalls(ctx: CanvasRenderingContext2D) {
 
       if (wallImg) {
         ctx.imageSmoothingEnabled = false
-        // Use a natural brick pattern — vary slightly by position
-        const srcCol = 8 + (tx % 2)
-        const srcRow = 12 + (ty % 6)
-        ctx.drawImage(wallImg, srcCol * 16, srcRow * 16, 16, 16, x, y, TILE, TILE)
+        // Use LDtk source rects: srcX alternates 128/144 per column, srcY advances by row
+        // Top wall rows 0-5: srcY = row * 16 + 192 (rows 12-17 of tileset = 192-272px)
+        // Row 6 back wall and any lower walls: use srcY=272 (bottom tile row)
+        const srcX = (tx % 2 === 0) ? 128 : 144
+        const clampedRow = Math.min(ty, 5)
+        const srcY = clampedRow * 16 + 192  // 192, 208, 224, 240, 256, 272
+        ctx.drawImage(wallImg, srcX, srcY, 16, 16, x, y, TILE, TILE)
       } else {
         // Fallback: solid wall color
         ctx.fillStyle = COLORS.wallBase

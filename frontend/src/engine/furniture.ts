@@ -12,6 +12,8 @@ export interface PlacedFurniture {
   row: number          // Tile row position
   mirrored?: boolean   // Draw horizontally flipped
   zY: number           // Y-sort value for draw order
+  pxX?: number         // Direct pixel X override (from LDtk entity px)
+  pxY?: number         // Direct pixel Y override (from LDtk entity px)
 }
 
 /**
@@ -30,12 +32,19 @@ export function buildFurnitureLayout(): PlacedFurniture[] {
     // they sit on, so boost their zY to sort after the desk/table at the same row
     const isSurfaceItem = asset?.canPlaceOnSurfaces ?? false
     const surfaceBoost = isSurfaceItem ? TILE + 1 : 0
+    // For pxY items, use pxY + height as the zY sort key (bottom of sprite)
+    const effectiveZY = item.pxY !== undefined
+      ? item.pxY + (getFurnitureAsset(item.type)?.height ?? TILE) + surfaceBoost
+      : isFloorLevel ? -1 : (item.row + footprintH) * TILE + surfaceBoost
+
     items.push({
       type: item.type,
       col: item.col,
       row: item.row,
       mirrored: item.mirrored ?? false,
-      zY: isFloorLevel ? -1 : (item.row + footprintH) * TILE + surfaceBoost,
+      zY: effectiveZY,
+      pxX: item.pxX,
+      pxY: item.pxY,
     })
   }
 
@@ -194,15 +203,30 @@ export function drawFurnitureSprite(
   // Ensure crisp pixel art scaling (especially for Pixel Agents 16px sprites at 2x)
   ctx.imageSmoothingEnabled = false
 
-  const x = item.col * TILE
-  // Sprites extend upward from their footprint bottom, anchored at bottom of footprint
-  const footprintBottom = (item.row + asset.footprintH) * TILE
-  let y = footprintBottom - asset.height
+  // Use direct pixel coordinates when provided (from LDtk entity px values)
+  // Otherwise use the grid-based formula
+  let x: number
+  let y: number
 
-  // Items that sit on surfaces (laptops, coffee cups) get a Y offset
-  // to visually appear on top of the desk/table surface.
-  if (asset.canPlaceOnSurfaces) {
-    y -= Math.floor(TILE * 0.35)
+  if (item.pxX !== undefined) {
+    x = item.pxX
+  } else {
+    x = item.col * TILE
+  }
+
+  if (item.pxY !== undefined) {
+    // Direct pixel Y — place sprite top at this Y coordinate
+    y = item.pxY
+  } else {
+    // Sprites extend upward from their footprint bottom, anchored at bottom of footprint
+    const footprintBottom = (item.row + asset.footprintH) * TILE
+    y = footprintBottom - asset.height
+
+    // Items that sit on surfaces (laptops, coffee cups) get a Y offset
+    // to visually appear on top of the desk/table surface.
+    if (asset.canPlaceOnSurfaces) {
+      y -= Math.floor(TILE * 0.35)
+    }
   }
 
   const sr = asset.sourceRect
