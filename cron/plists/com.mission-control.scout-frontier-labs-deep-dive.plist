@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>CLAUDE_MODEL</key>
+		<string>sonnet</string>
+		<key>HOME</key>
+		<string>/Users/josephinewood</string>
+		<key>PATH</key>
+		<string>/Users/josephinewood/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>VAULT_DIR</key>
+		<string>/Users/josephinewood/fern-vault</string>
+	</dict>
+	<key>Label</key>
+	<string>com.mission-control.scout-frontier-labs-deep-dive</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/Users/josephinewood/mission-control/cron/scripts/scout-frontier-labs-deep-dive.sh</string>
+	</array>
+	<key>StandardErrorPath</key>
+	<string>/Users/josephinewood/Library/Logs/mission-control/scout-frontier-labs-deep-dive.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/josephinewood/Library/Logs/mission-control/scout-frontier-labs-deep-dive.log</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>9</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+		<key>Weekday</key>
+		<integer>1</integer>
+	</dict>
+	<key>ThrottleInterval</key>
+	<integer>60</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/josephinewood/fern-vault</string>
+</dict>
+</plist>

@@ -36,6 +36,7 @@ Plist Hour/Minute values below are **local time** — what launchd actually read
 | reed-weekly-content | Reed | Thu 9:00am | 9 / 0 | 4 (Thu) |
 | scout-weekly-content-review | Scout | Fri 5:00pm | 17 / 0 | 5 (Fri) |
 | scout-derek-job-scan | Scout | Wed 8:00am | 8 / 0 | 3 (Wed) |
+| scout-frontier-labs-deep-dive | Scout | Mon 9:00am | 9 / 0 | 1 (Mon) |
 
 ## Installation
 
@@ -76,6 +77,7 @@ cron/
     reed-weekly-content.sh
     scout-weekly-content-review.sh
     scout-derek-job-scan.sh
+    scout-frontier-labs-deep-dive.sh
   plists/              # launchd plists (one per job)
     com.mission-control.scout-daily-brief.plist
     com.mission-control.sentinel-context-collection.plist
@@ -85,6 +87,7 @@ cron/
     com.mission-control.reed-weekly-content.plist
     com.mission-control.scout-weekly-content-review.plist
     com.mission-control.scout-derek-job-scan.plist
+    com.mission-control.scout-frontier-labs-deep-dive.plist
 ```
 
 ## Logs
