@@ -1,0 +1,92 @@
+#!/Users/josephinewood/mission-control/tools/.venv/bin/python3
+"""
+gemini-search — Grounded web search via Gemini Flash + Google Search
+
+Usage: gemini-search "your query here"
+
+Returns: grounded synthesis + source URLs
+Cost: ~1/10 of routing through Claude Sonnet; 3-5x faster
+
+Note: Uses gemini-2.5-flash (gemini-2.0-flash deprecated for new API keys on free tier).
+gemini-2.5-flash is newer/better — same Flash cost tier, same grounding capability.
+"""
+
+import sys
+import os
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: gemini-search \"your query\"", file=sys.stderr)
+        sys.exit(1)
+
+    query = " ".join(sys.argv[1:])
+
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        # Try reading from file directly as fallback
+        key_file = os.path.expanduser("~/.config/fern/gemini_key")
+        try:
+            with open(key_file) as f:
+                api_key = f.read().strip()
+        except FileNotFoundError:
+            print("ERROR: GEMINI_API_KEY not set and ~/.config/fern/gemini_key not found", file=sys.stderr)
+            sys.exit(2)
+
+    try:
+        from google import genai
+        from google.genai import types
+    except ImportError as e:
+        print(f"ERROR: google-genai SDK not available: {e}", file=sys.stderr)
+        print("Install: pip install google-genai", file=sys.stderr)
+        sys.exit(3)
+
+    try:
+        client = genai.Client(api_key=api_key)
+
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=query,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+            ),
+        )
+
+        # Extract text content
+        text = response.text if response.text else ""
+
+        # Extract grounding sources
+        sources = []
+        if (
+            response.candidates
+            and response.candidates[0].grounding_metadata
+            and response.candidates[0].grounding_metadata.grounding_chunks
+        ):
+            for chunk in response.candidates[0].grounding_metadata.grounding_chunks:
+                if hasattr(chunk, "web") and chunk.web:
+                    uri = getattr(chunk.web, "uri", None)
+                    title = getattr(chunk.web, "title", None)
+                    if uri:
+                        sources.append((title or uri, uri))
+
+        # Output synthesis
+        print(text)
+
+        # Output sources section
+        if sources:
+            print("\n--- Sources ---")
+            seen = set()
+            for title, uri in sources:
+                if uri not in seen:
+                    seen.add(uri)
+                    print(f"- {title}: {uri}")
+        else:
+            print("\n--- Sources ---")
+            print("(No grounding sources returned — response may be from model knowledge)")
+
+    except Exception as e:
+        print(f"ERROR: Gemini API call failed: {e}", file=sys.stderr)
+        sys.exit(4)
+
+
+if __name__ == "__main__":
+    main()
