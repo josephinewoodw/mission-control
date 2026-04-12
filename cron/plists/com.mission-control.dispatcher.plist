@@ -8,6 +8,10 @@
 		<string>sonnet</string>
 		<key>HOME</key>
 		<string>/Users/josephinewood</string>
+		<key>LOGNAME</key>
+		<string>josephinewood</string>
+		<key>USER</key>
+		<string>josephinewood</string>
 		<key>MC_API_BASE</key>
 		<string>http://localhost:4981/api</string>
 		<key>PATH</key>

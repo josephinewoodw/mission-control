@@ -9,6 +9,7 @@
 # Agents are responsible for updating kanban status themselves once running.
 #
 # Logs: ~/Library/Logs/mission-control/dispatcher.log
+# Failure log: ~/Library/Logs/mission-control/dispatcher-failures.log
 
 JOB="dispatcher"
 VAULT_DIR="${VAULT_DIR:-$HOME/fern-vault}"
@@ -66,6 +67,11 @@ vault_dir     = os.environ.get("VAULT_DIR", os.path.expanduser("~/fern-vault"))
 claude        = os.environ.get("CLAUDE_PATH", os.path.expanduser("~/.local/bin/claude"))
 model         = os.environ.get("CLAUDE_MODEL", "sonnet")
 log_dir       = os.environ.get("LOG_DIR", os.path.expanduser("~/Library/Logs/mission-control"))
+# IMPORTANT: wrapper path must be explicit — this script runs from a temp file,
+# so os.path.dirname(__file__) would resolve to /tmp, not the cron/scripts dir.
+wrapper       = os.environ.get("DISPATCHER_WRAPPER", os.path.expanduser(
+    "~/mission-control/cron/scripts/dispatcher-agent-wrapper.sh"
+))
 
 with open(response_file) as f:
     data = json.load(f)
@@ -80,8 +86,11 @@ AGENT_IDENTITY = {
     "fern":     ".claude/rules",
 }
 
-def patch_task(task_id, status):
-    payload = json.dumps({"status": status}).encode()
+def patch_task(task_id, status, error_msg=None):
+    payload_dict = {"status": status}
+    if error_msg:
+        payload_dict["error"] = error_msg
+    payload = json.dumps(payload_dict).encode()
     req = urllib.request.Request(
         f"{api_base}/kanban/{task_id}",
         data=payload,
@@ -95,6 +104,14 @@ def patch_task(task_id, status):
         print(f"    WARNING: could not patch task {task_id}: {e}")
         return False
 
+def log_failure(task_id, agent, title, reason):
+    failure_log = os.path.join(log_dir, "dispatcher-failures.log")
+    from datetime import datetime, timezone
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with open(failure_log, "a") as f:
+        f.write(f"[{ts}] task {task_id} [{agent}] {title[:60]}\n")
+        f.write(f"  reason: {reason}\n\n")
+
 for task in data:
     task_id   = task["id"]
     title     = task["title"]
@@ -104,8 +121,10 @@ for task in data:
     print(f"  → task {task_id}: [{agent}] {title[:60]}")
 
     if agent not in AGENT_IDENTITY:
-        print(f"    ERROR: unknown agent '{agent}' — marking failed")
+        msg = f"unknown agent '{agent}'"
+        print(f"    ERROR: {msg} — marking failed")
         patch_task(task_id, "failed")
+        log_failure(task_id, agent, title, msg)
         continue
 
     identity_path = AGENT_IDENTITY[agent]
@@ -137,27 +156,65 @@ for task in data:
 
     prompt = "\n".join(prompt_parts)
 
-    # Spawn claude -p in background (non-blocking — agent runs independently)
+    # Spawn claude via wrapper script (wrapper handles exit code → task failure)
     task_log = os.path.join(log_dir, f"dispatch-task-{task_id}.log")
-    cmd = [claude, "--print", "--model", model, "--dangerously-skip-permissions", prompt]
+    pid_file = os.path.join(log_dir, f"dispatch-task-{task_id}.pid")
+
+    # Write prompt to a temp file so it's not passed on the command line
+    import tempfile
+    prompt_file = tempfile.NamedTemporaryFile(
+        mode='w', prefix=f'dispatcher-prompt-{task_id}-', suffix='.txt',
+        dir='/tmp', delete=False
+    )
+    prompt_file.write(prompt)
+    prompt_file.close()
+
+    # Validate wrapper exists before spawning
+    if not os.path.isfile(wrapper):
+        msg = f"wrapper script not found: {wrapper}"
+        print(f"    ERROR: {msg}")
+        patch_task(task_id, "failed")
+        log_failure(task_id, agent, title, msg)
+        continue
+
+    cmd = [
+        "/bin/bash",
+        wrapper,
+        str(task_id),
+        agent,
+        prompt_file.name,
+        task_log,
+        pid_file,
+        claude,
+        model,
+        api_base,
+        vault_dir,
+        log_dir,
+    ]
 
     try:
-        with open(task_log, "a") as lf:
-            proc = subprocess.Popen(
-                cmd,
-                cwd=vault_dir,
-                stdout=lf,
-                stderr=lf,
-            )
-        print(f"    spawned PID {proc.pid} — log: {task_log}")
+        # Use setsid so the child is in its own session — detached from dispatcher lifecycle
+        proc = subprocess.Popen(
+            cmd,
+            start_new_session=True,
+            close_fds=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        print(f"    spawned wrapper PID {proc.pid} — log: {task_log}")
     except Exception as e:
-        print(f"    ERROR: spawn failed: {e}")
+        msg = f"spawn failed: {e}"
+        print(f"    ERROR: {msg}")
         patch_task(task_id, "failed")
+        log_failure(task_id, agent, title, msg)
+        os.unlink(prompt_file.name)
 
 print("  dispatch complete")
 PYEOF
 
-DISPATCHER_RESPONSE_FILE="$RESPONSE_FILE" python3 "$DISPATCH_PY"
+DISPATCHER_RESPONSE_FILE="$RESPONSE_FILE" \
+DISPATCHER_WRAPPER="$(dirname "$0")/dispatcher-agent-wrapper.sh" \
+python3 "$DISPATCH_PY"
 
 rm -f "$RESPONSE_FILE" "$DISPATCH_PY"
 echo "=== dispatcher done at $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
