@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { PermissionAlert } from './components/PermissionAlert'
 import { OfficeScene } from './components/OfficeScene'
+import { SolarpunkScene } from './components/SolarpunkScene'
 import { ActivityFeed } from './components/ActivityFeed'
 import { DailySummaryPanel } from './components/DailySummaryPanel'
 import { FernTerminal } from './components/FernTerminal'
@@ -31,6 +32,7 @@ function App() {
   const { tasksByAgent } = useAgentTasks(connected)
   const [currentPage, setCurrentPage] = useState<Page>('dashboard')
   const [selectedAgent, setSelectedAgent] = useState<AgentName | null>(null)
+  const [sceneMode, setSceneMode] = useState<'pixel' | 'solarpunk'>('pixel')
 
   // Merge task state into agent state.
   // If an agent has an active task in the task queue but the event-driven state
@@ -215,11 +217,21 @@ function App() {
 
             {/* Top: Office Scene — dominant focal point */}
             <div className="flex-1 p-5 min-h-0 overflow-hidden flex flex-col">
-              {/* Header row: label + agent pills */}
+              {/* Header row: label + scene toggle + agent pills */}
               <div className="flex items-center justify-between mb-3 shrink-0">
-                <h2 className="text-xs text-gray-500 uppercase tracking-widest font-medium">
-                  Agents
-                </h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xs text-gray-500 uppercase tracking-widest font-medium">
+                    Agents
+                  </h2>
+                  {/* Scene mode toggle */}
+                  <button
+                    onClick={() => setSceneMode(prev => prev === 'pixel' ? 'solarpunk' : 'pixel')}
+                    className="text-[0.58rem] font-medium px-2 py-0.5 rounded border border-border text-gray-500 hover:border-fern/30 hover:text-gray-300 transition-colors"
+                    title="Toggle between pixel art and solarpunk scene"
+                  >
+                    {sceneMode === 'pixel' ? '🌿 Solarpunk' : '🎮 Pixel'}
+                  </button>
+                </div>
                 {/* Clickable agent pills — click to show task panel */}
                 <div className="flex items-center gap-1.5">
                   {(['fern', 'scout', 'reed', 'sentinel', 'timber'] as AgentName[]).map(name => {
@@ -267,7 +279,11 @@ function App() {
               )}
 
               <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
-                <OfficeScene agents={agents} />
+                {sceneMode === 'pixel' ? (
+                  <OfficeScene agents={agents} />
+                ) : (
+                  <SolarpunkScene agents={agents} />
+                )}
               </div>
             </div>
 
