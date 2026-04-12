@@ -45,7 +45,7 @@ router.post('/kanban', async (c) => {
 
   try {
     const body = await c.req.json()
-    const { title, description, agent_name, status, priority } = body
+    const { title, description, agent_name, status, priority, source } = body
 
     if (!title || typeof title !== 'string') {
       return c.json({ error: 'title is required' }, 400)
@@ -66,6 +66,7 @@ router.post('/kanban', async (c) => {
       agentName: agent_name,
       status: status ?? 'queued',
       priority: priority ?? 'medium',
+      source: source ?? null,
     })
 
     const task = await store.getKanbanTaskById(id)

@@ -135,6 +135,7 @@ export class SqliteAdapter implements EventStore {
     // Add new columns to kanban_tasks if they don't exist (migration for existing DBs)
     try { this.db.exec(`ALTER TABLE kanban_tasks ADD COLUMN tool_use_id TEXT`) } catch { /* exists */ }
     try { this.db.exec(`ALTER TABLE kanban_tasks ADD COLUMN session_id TEXT`) } catch { /* exists */ }
+    try { this.db.exec(`ALTER TABLE kanban_tasks ADD COLUMN source TEXT`) } catch { /* exists */ }
 
     // Migrate status names: backlog→queued, done→completed
     this.db.exec(`UPDATE kanban_tasks SET status = 'queued' WHERE status = 'backlog'`)
@@ -807,12 +808,13 @@ export class SqliteAdapter implements EventStore {
     agentName: string
     status?: KanbanStatus
     priority?: KanbanPriority
+    source?: string | null
   }): Promise<number> {
     const now = Date.now()
     const result = this.db
       .prepare(
-        `INSERT INTO kanban_tasks (title, description, agent_name, status, priority, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO kanban_tasks (title, description, agent_name, status, priority, created_at, updated_at, source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         params.title,
@@ -822,6 +824,7 @@ export class SqliteAdapter implements EventStore {
         params.priority ?? 'medium',
         now,
         now,
+        params.source ?? null,
       )
     return result.lastInsertRowid as number
   }
@@ -924,14 +927,16 @@ export class SqliteAdapter implements EventStore {
   }
 
   async getPendingDispatchTasks(): Promise<KanbanTask[]> {
-    // Returns queued tasks created via the UI (tool_use_id IS NULL and session_id IS NULL),
-    // meaning Fern hasn't seen them yet. Fern polls this to dispatch newly created tasks.
+    // Returns queued tasks created via the UI (source = 'ui'),
+    // meaning the dispatcher hasn't spawned the agent yet.
+    // Excludes tasks older than 24h to prevent stale auto-dispatch.
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000
     return this.db
       .prepare(
         `SELECT * FROM kanban_tasks
          WHERE status = 'queued'
-           AND tool_use_id IS NULL
-           AND session_id IS NULL
+           AND source = 'ui'
+           AND created_at > ?
          ORDER BY
            CASE priority
              WHEN 'high' THEN 0
@@ -941,6 +946,6 @@ export class SqliteAdapter implements EventStore {
            END,
            created_at ASC`,
       )
-      .all() as KanbanTask[]
+      .all(cutoff) as KanbanTask[]
   }
 }

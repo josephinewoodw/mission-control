@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>CLAUDE_MODEL</key>
+		<string>sonnet</string>
+		<key>HOME</key>
+		<string>/Users/josephinewood</string>
+		<key>MC_API_BASE</key>
+		<string>http://localhost:4981/api</string>
+		<key>PATH</key>
+		<string>/Users/josephinewood/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>VAULT_DIR</key>
+		<string>/Users/josephinewood/fern-vault</string>
+	</dict>
+	<key>Label</key>
+	<string>com.mission-control.dispatcher</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/Users/josephinewood/mission-control/cron/scripts/dispatcher.sh</string>
+	</array>
+	<key>StandardErrorPath</key>
+	<string>/Users/josephinewood/Library/Logs/mission-control/dispatcher.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/josephinewood/Library/Logs/mission-control/dispatcher.log</string>
+	<key>StartInterval</key>
+	<integer>30</integer>
+	<key>ThrottleInterval</key>
+	<integer>15</integer>
+</dict>
+</plist>

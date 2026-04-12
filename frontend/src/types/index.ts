@@ -168,6 +168,7 @@ export interface KanbanTask {
   completed_at: number | null
   tool_use_id: string | null
   session_id: string | null
+  source: string | null
 }
 
 /** Agent task — alias for unified KanbanTask for backward compat */

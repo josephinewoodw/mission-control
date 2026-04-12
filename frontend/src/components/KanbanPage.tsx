@@ -124,7 +124,14 @@ function TaskCard({ task, onDragStart, onEdit }: TaskCardProps) {
       )}
 
       <div className="flex items-center justify-between gap-2">
-        <AgentPill agent={task.agent_name} />
+        <div className="flex items-center gap-1.5">
+          <AgentPill agent={task.agent_name} />
+          {task.source === 'ui' && task.status === 'queued' && (
+            <span className="text-[0.55rem] px-1 py-0.5 rounded border border-fern/30 text-fern/70 font-medium animate-pulse">
+              auto
+            </span>
+          )}
+        </div>
         <PriorityIndicator priority={task.priority} />
       </div>
     </div>

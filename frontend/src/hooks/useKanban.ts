@@ -89,7 +89,9 @@ export function useKanban(): UseKanbanReturn {
       const res = await fetch(`${API_BASE}/kanban`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
+        // Always mark tasks created from the UI with source='ui' so the
+        // dispatcher knows to auto-spawn the matching agent.
+        body: JSON.stringify({ ...params, source: 'ui' }),
       })
       if (!res.ok) {
         const err = await res.json()

@@ -116,6 +116,7 @@ export interface EventStore {
     agentName: string
     status?: KanbanStatus
     priority?: KanbanPriority
+    source?: string | null
   }): Promise<number>
   getKanbanTasks(): Promise<KanbanTask[]>
   getKanbanTaskById(id: number): Promise<KanbanTask | null>
@@ -148,4 +149,5 @@ export interface KanbanTask {
   completed_at: number | null
   tool_use_id: string | null
   session_id: string | null
+  source: string | null
 }
