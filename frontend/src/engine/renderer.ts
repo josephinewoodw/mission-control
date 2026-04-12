@@ -207,12 +207,34 @@ function drawCollaborationLines(ctx: CanvasRenderingContext2D, characters: Chara
   const halfSprite = Math.floor(SPRITE_SIZE / 2)
   const drawn = new Set<string>()
 
+  // First pass: draw pulsing halo rings around collaborating characters
+  for (const char of characters) {
+    if (!char.collaboratingWith) continue
+    const haloAlpha = 0.18 + 0.12 * Math.sin(time / 500)
+    const haloRadius = 20 + 3 * Math.sin(time / 700)
+    const cx = char.x + halfSprite
+    const cy = char.y + halfSprite
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(cx, cy, haloRadius, 0, Math.PI * 2)
+    ctx.strokeStyle = `rgba(120, 200, 180, ${haloAlpha * 2})`
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(cx, cy, haloRadius + 4, 0, Math.PI * 2)
+    ctx.strokeStyle = `rgba(120, 200, 180, ${haloAlpha})`
+    ctx.lineWidth = 0.5
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  // Second pass: draw curved arc between collaborating pairs
   for (const char of characters) {
     if (!char.collaboratingWith) continue
     const partner = characters.find(c => c.name === char.collaboratingWith)
     if (!partner) continue
 
-    // Avoid drawing the same line twice
+    // Avoid drawing the same arc twice
     const key = [char.name, partner.name].sort().join('-')
     if (drawn.has(key)) continue
     drawn.add(key)
@@ -222,31 +244,59 @@ function drawCollaborationLines(ctx: CanvasRenderingContext2D, characters: Chara
     const x2 = partner.x + halfSprite
     const y2 = partner.y + halfSprite
 
-    // Animated pulse: alpha oscillates with time
-    const pulse = 0.3 + 0.2 * Math.sin(time / 600)
+    // Control point: offset perpendicular to the line for a gentle arc
+    const mx = (x1 + x2) / 2
+    const my = (y1 + y2) / 2
+    const dx = x2 - x1
+    const dy = y2 - y1
+    const len = Math.sqrt(dx * dx + dy * dy) || 1
+    // Perpendicular offset: 20% of the distance, alternating direction
+    const perpScale = 0.2
+    const cpx = mx - (dy / len) * len * perpScale
+    const cpy = my + (dx / len) * len * perpScale
 
+    // Animated pulse: alpha oscillates with time
+    const pulse = 0.35 + 0.2 * Math.sin(time / 600)
+
+    // Glow pass (wider, more transparent)
     ctx.save()
     ctx.beginPath()
     ctx.moveTo(x1, y1)
-    ctx.lineTo(x2, y2)
+    ctx.quadraticCurveTo(cpx, cpy, x2, y2)
+    ctx.strokeStyle = `rgba(120, 200, 180, ${pulse * 0.4})`
+    ctx.lineWidth = 4
+    ctx.setLineDash([])
+    ctx.stroke()
+    ctx.restore()
+
+    // Main dashed arc
+    ctx.save()
+    ctx.beginPath()
+    ctx.moveTo(x1, y1)
+    ctx.quadraticCurveTo(cpx, cpy, x2, y2)
     ctx.strokeStyle = `rgba(120, 200, 180, ${pulse})`
-    ctx.lineWidth = 1
-    ctx.setLineDash([4, 6])
-    ctx.lineDashOffset = -(time / 120) % 10
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([5, 7])
+    ctx.lineDashOffset = -(time / 100) % 12
     ctx.stroke()
     ctx.setLineDash([])
     ctx.restore()
 
-    // Animated midpoint dot
-    const mx = (x1 + x2) / 2
-    const my = (y1 + y2) / 2
-    const dotAlpha = 0.5 + 0.3 * Math.sin(time / 400)
-    ctx.save()
-    ctx.beginPath()
-    ctx.arc(mx, my, 2.5, 0, Math.PI * 2)
-    ctx.fillStyle = `rgba(120, 200, 180, ${dotAlpha})`
-    ctx.fill()
-    ctx.restore()
+    // Two traveling dots along the arc (bidirectional data flow)
+    for (let i = 0; i < 2; i++) {
+      // Each dot offset by 0.5 in t-space so they appear on opposite ends
+      const t = ((time / 1200 + i * 0.5) % 1)
+      // Quadratic bezier position
+      const bx = (1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * cpx + t * t * x2
+      const by = (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * cpy + t * t * y2
+      const dotAlpha = 0.6 + 0.3 * Math.sin(time / 300 + i * Math.PI)
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(bx, by, 2, 0, Math.PI * 2)
+      ctx.fillStyle = `rgba(160, 230, 210, ${dotAlpha})`
+      ctx.fill()
+      ctx.restore()
+    }
   }
 }
 
