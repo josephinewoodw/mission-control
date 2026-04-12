@@ -3,6 +3,7 @@ import type { AgentState } from '../types'
 
 interface SolarpunkSceneProps {
   agents: Record<string, AgentState>
+  isLight?: boolean
 }
 
 /** True if any agent is actively working */
@@ -48,7 +49,7 @@ function getDayNightStyle(hour: number): React.CSSProperties {
  *   7. day/night overlay
  *   8. status bar overlay
  */
-export function SolarpunkScene({ agents }: SolarpunkSceneProps) {
+export function SolarpunkScene({ agents, isLight = false }: SolarpunkSceneProps) {
   const [hour, setHour] = useState(new Date().getHours())
   const sceneRef = useRef<HTMLDivElement>(null)
 
@@ -99,7 +100,7 @@ export function SolarpunkScene({ agents }: SolarpunkSceneProps) {
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        background: isNight ? '#0a1020' : isDusk ? '#1a0a05' : '#0a0a0a',
+        background: isLight ? '#d8d4cc' : isNight ? '#0a1020' : isDusk ? '#1a0a05' : '#0a0a0a',
       }}
     >
       {/* Scene container — 1456x816 native, CSS-scaled */}
@@ -236,9 +237,10 @@ export function SolarpunkScene({ agents }: SolarpunkSceneProps) {
           }}
         />
 
-        {/* Day/night tint overlay */}
+        {/* Day/night tint overlay — suppressed in light mode via .solarpunk-night-overlay CSS */}
         {Object.keys(nightStyle).length > 0 && (
           <div
+            className="solarpunk-night-overlay"
             style={{
               position: 'absolute',
               inset: 0,

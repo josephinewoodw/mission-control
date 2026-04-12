@@ -13,6 +13,7 @@ import { AnalyticsPage } from './components/AnalyticsPage'
 import { useAgentEvents } from './hooks/useAgentEvents'
 import { useOperationalData } from './hooks/useOperationalData'
 import { useAgentTasks } from './hooks/useAgentTasks'
+import { useColorMode } from './hooks/useColorMode'
 import { formatBubbleText } from './utils'
 import type { AgentName } from './types'
 
@@ -30,6 +31,7 @@ function App() {
   const { agents: rawAgents, events, connected, usingSeed, blockedAgents } = useAgentEvents()
   const { crons, integrations, context, runs, summaryItems, tokenStats, liveTokenStats } = useOperationalData(connected)
   const { tasksByAgent } = useAgentTasks(connected)
+  const { mode: colorMode, toggle: toggleColorMode, isLight } = useColorMode()
   const [currentPage, setCurrentPage] = useState<Page>('dashboard')
   const [selectedAgent, setSelectedAgent] = useState<AgentName | null>(null)
   const [sceneMode, setSceneMode] = useState<'pixel' | 'solarpunk'>('pixel')
@@ -231,6 +233,15 @@ function App() {
                   >
                     {sceneMode === 'pixel' ? '🌿 Solarpunk' : '🎮 Pixel'}
                   </button>
+                  {/* Light/dark mode toggle */}
+                  <button
+                    onClick={toggleColorMode}
+                    className="text-[0.58rem] font-medium px-2 py-0.5 rounded border border-border text-gray-500 hover:border-fern/30 hover:text-gray-300 transition-colors"
+                    title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+                    aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+                  >
+                    {isLight ? '🌙 Dark' : '☀️ Light'}
+                  </button>
                 </div>
                 {/* Clickable agent pills — click to show task panel */}
                 <div className="flex items-center gap-1.5">
@@ -282,7 +293,7 @@ function App() {
                 {sceneMode === 'pixel' ? (
                   <OfficeScene agents={agents} />
                 ) : (
-                  <SolarpunkScene agents={agents} />
+                  <SolarpunkScene agents={agents} isLight={isLight} />
                 )}
               </div>
             </div>

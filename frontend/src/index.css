@@ -24,6 +24,76 @@ body {
   min-height: 100vh;
 }
 
+/* ─── Light Mode ─────────────────────────────────────────────────────────── */
+
+html.light {
+  /* Surface layers — warm off-white, not harsh pure-white */
+  --color-bg-primary: #f0ede8;
+  --color-bg-card: #e8e4de;
+  --color-bg-dark: #dedad3;
+  /* Borders — soft stone */
+  --color-border: #c8c4bc;
+  --color-border-light: #b8b4ac;
+  /* Agent accent colors — desaturated for daylight */
+  --color-fern: #3d7a3d;
+  --color-scout: #2e6080;
+  --color-reed: #7a6030;
+  --color-sentinel: #5c3d7a;
+  --color-working: #2e7a2e;
+  --color-blocked: #c0392b;
+  --color-idle: #888;
+  --color-offline: #aaa;
+}
+
+html.light body {
+  background: var(--color-bg-primary);
+  color: #1a1a1a;
+}
+
+/* Light mode text overrides — Tailwind's text-gray-* hardcodes HSL values,
+   so we override the classes that appear as body text throughout the app */
+html.light .text-gray-200 { color: #1a1a1a; }
+html.light .text-gray-300 { color: #2a2a2a; }
+html.light .text-gray-400 { color: #444444; }
+html.light .text-gray-500 { color: #666666; }
+html.light .text-gray-600 { color: #888888; }
+
+/* Surface overrides for panels that use bg-bg-* directly in JSX */
+html.light .bg-bg-primary { background-color: #f0ede8; }
+html.light .bg-bg-card    { background-color: #e8e4de; }
+html.light .bg-bg-dark    { background-color: #dedad3; }
+html.light .bg-bg-dark\/30 { background-color: rgba(222,218,211,0.3); }
+html.light .bg-bg-dark\/50 { background-color: rgba(222,218,211,0.5); }
+html.light .bg-bg-card\/50 { background-color: rgba(232,228,222,0.5); }
+
+/* Borders */
+html.light .border-border        { border-color: #c8c4bc; }
+html.light .border-border\/50    { border-color: rgba(200,196,188,0.5); }
+html.light .border-border\/40    { border-color: rgba(200,196,188,0.4); }
+
+/* Scrollbar for light mode */
+html.light .feed-scroll::-webkit-scrollbar-thumb {
+  background: #c0bdb6;
+}
+
+/* Terminal in light mode — sepia/warm tone instead of dark shell */
+html.light .font-mono { color: #2a2a2a; }
+
+/* Reduce glow animations in light mode */
+html.light .animate-alert-pulse {
+  animation: alert-pulse-light 1.5s ease-in-out infinite;
+}
+
+@keyframes alert-pulse-light {
+  0%, 100% { box-shadow: 0 0 8px rgba(192, 57, 43, 0.1); }
+  50% { box-shadow: 0 0 20px rgba(192, 57, 43, 0.25); }
+}
+
+/* Solarpunk night overlay: force "day" in light mode */
+html.light .solarpunk-night-overlay {
+  opacity: 0 !important;
+}
+
 /* Custom scrollbar for activity feed */
 .feed-scroll::-webkit-scrollbar {
   width: 4px;
