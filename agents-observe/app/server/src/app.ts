@@ -18,6 +18,7 @@ import operationalRouter from './routes/operational'
 import statsRouter from './routes/stats'
 import tasksRouter from './routes/tasks'
 import kanbanRouter from './routes/kanban'
+import logsRouter from './routes/logs'
 
 type Env = {
   Variables: {
@@ -55,6 +56,7 @@ export function createApp(
   app.route('/api', statsRouter)
   app.route('/api', tasksRouter)
   app.route('/api', kanbanRouter)
+  app.route('/api', logsRouter)
 
   // Serve built client static files when clientDistPath is configured
   const clientDistPath = config.clientDistPath
