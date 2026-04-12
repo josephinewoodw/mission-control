@@ -28,6 +28,7 @@ Plist Hour/Minute values below are **local time** — what launchd actually read
 
 | Job | Agent | Local time | Plist Hour / Minute | Weekday |
 |-----|-------|-----------|----------------------|---------|
+| dispatcher | system | Every 30s | `StartInterval` 30s | n/a |
 | scout-daily-brief | Scout | 6:57am daily | 6 / 57 | any |
 | sentinel-context-collection | Sentinel | Every 3h at :17 | `StartInterval` 10800s | n/a |
 | sentinel-health-check-morning | Sentinel | 6:00am daily | 6 / 0 | any |
@@ -37,6 +38,15 @@ Plist Hour/Minute values below are **local time** — what launchd actually read
 | scout-weekly-content-review | Scout | Fri 5:00pm | 17 / 0 | 5 (Fri) |
 | scout-derek-job-scan | Scout | Wed 8:00am | 8 / 0 | 3 (Wed) |
 | scout-frontier-labs-deep-dive | Scout | Mon 9:00am | 9 / 0 | 1 (Mon) |
+
+### Dispatcher (special)
+
+The `dispatcher` job polls `/api/kanban/pending-dispatch` every 30s. Any task created from the kanban UI (with `source='ui'`) gets auto-dispatched to the matching agent via `claude -p`. The dispatcher:
+1. Claims the task (`PATCH status=in_progress`) to prevent double-dispatch
+2. Spawns `claude -p --model sonnet --dangerously-skip-permissions` with the agent identity doc + kanban update instructions
+3. Logs to `~/Library/Logs/mission-control/dispatch-task-{id}.log`
+
+The dispatcher does NOT use `install.sh` — it's loaded separately and managed outside the standard batch install.
 
 ## Installation
 
